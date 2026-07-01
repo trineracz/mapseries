@@ -157,8 +157,9 @@ public class GithubService implements Serializable {
         UserService userService = new UserService(githubClient);
         User user = userService.getUser();
 
-        Repository repository = repositoryService.getRepository(Constants.REPO_USER, Constants.REPO_NAME);
-        
+        // Commit to the WRITE repo (our fork), never the production read repo.
+        Repository repository = repositoryService.getRepository(Constants.REPO_WRITE_USER, Constants.REPO_WRITE_NAME);
+
         Blob blob = new Blob();
         blob.setContent(content);
         blob.setEncoding("utf-8");

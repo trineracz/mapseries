@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: headContent}"></head>
+<body>
+
+<th:block th:replace="~{fragments :: jsvars}"></th:block>
+
+<div id="map"></div>
+<script>
+    window.mapSettings = null;
+    window.map.main();
+</script>
+
+<div th:replace="~{fragments :: panel}"></div>
+
+<div id="content">
+    <div class="top-panel red container">
+        <div class="row">
+            <h3 th:text="#{aboutMapseriesOnline}"></h3>
+        </div>
+        <div class="row">
+            <div class="col" th:utext="#{indexTopPanelText1}"></div>
+            <div class="col" th:utext="#{indexTopPanelText2}"></div>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="left-text">
+            <h2 th:text="#{availableSeries} + ':'"></h2>
+            <div th:text="#{clickOnSerieInstructions}"></div>
+        </div>
+        <div class="series container-fluid">
+            <div class="row justify-content-start">
+                <div class="serie hoverable" th:each="serie : ${series}" th:attr="data-ref=${serie.name}">
+                    <div class="underlay"></div>
+                    <a th:href="@{/map.xhtml(serie=${serie.name})}">
+                        <div><img th:src="${serie.thumbnailUrl}"/></div>
+                        <div class="serie-title" th:utext="${serie.nameHtml}"></div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>window.index.main();</script>
+</div>
+
+<script>window.hoverable();</script>
+
+</body>
+</html>

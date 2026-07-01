@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: headContent}"></head>
+<body>
+
+<th:block th:replace="~{fragments :: jsvars}"></th:block>
+
+<div id="map"></div>
+<script th:inline="javascript">
+    window.mapSettings = {};
+    window.mapSettings.serie = /*[[${serieName}]]*/ '';
+    window.mapSettings.grid = /*[[${grid}]]*/ '';
+    window.mapSettings.sheetIds = [(${sheetIdsJson})];
+    window.map.main();
+</script>
+
+<div th:replace="~{fragments :: panel}"></div>
+
+<div id="content">
+    <div class="main sheet">
+
+        <div class="left-panel">
+            <div class="title" th:text="${sheetId}"></div>
+            <div class="text" th:text="#{availableVersionsOfSheet}"></div>
+
+            <div th:each="s,st : ${sheets}" class="hoverable item"
+                 th:classappend="${st.index == issue} ? 'active' : ''">
+                <div class="underlay"></div>
+                <div class="image">
+                    <a th:href="@{/sheet.xhtml(serie=${serieName},sheet=${sheetId},issue=${st.index})}">
+                        <table th:if="${s.thumbnailUnavailable}" class="thumbnail-unavailable">
+                            <tr><td class="align-middle" th:text="#{thumbnail-unavailable}"></td></tr>
+                        </table>
+                        <table th:if="${s.thumbnailCopyrighted}" class="thumbnail-copyrighted">
+                            <tr><td class="align-middle" th:text="#{thumbnail-copyrighted}"></td></tr>
+                        </table>
+                        <img th:if="${!s.thumbnailUnavailable and !s.thumbnailCopyrighted}"
+                             width="100px" th:src="${s.thumbnailUrl}"/>
+                    </a>
+                </div>
+                <div class="mt-1" style="width: 100px;" th:text="${@stringUtils.shortenWords(s.title, 10)}"></div>
+                <div style="width: 100px;" th:text="${s.year}"></div>
+            </div>
+        </div>
+
+        <div class="detail" th:if="${activeSheet != null}">
+            <a class="close-button" th:href="@{/map.xhtml(serie=${serieName})}"><i class="fas fa-times"></i></a>
+            <div>
+                <a th:if="${!issueFirst}" class="arrow left"
+                   th:href="@{/sheet.xhtml(serie=${serieName},sheet=${sheetId},issue=${issue - 1})}"><i class="fas fa-angle-left"></i></a>
+                <a th:href="${activeSheet.digitalLibraryUrl}" class="no-anchor" target="_blank">
+                    <table th:if="${activeSheet.thumbnailUnavailable}" class="thumbnail-unavailable">
+                        <tr><td class="align-middle" th:text="#{thumbnail-unavailable}"></td></tr>
+                    </table>
+                    <table th:if="${activeSheet.thumbnailCopyrighted}" class="thumbnail-copyrighted">
+                        <tr><td class="align-middle" th:text="#{thumbnail-copyrighted}"></td></tr>
+                    </table>
+                    <img th:if="${!activeSheet.thumbnailUnavailable and !activeSheet.thumbnailCopyrighted}"
+                         height="300px" th:src="${activeSheet.thumbnailUrl}"/>
+                </a>
+                <a th:if="${!issueLast}" class="arrow right"
+                   th:href="@{/sheet.xhtml(serie=${serieName},sheet=${sheetId},issue=${issue + 1})}"><i class="fas fa-angle-right"></i></a>
+            </div>
+
+            <div class="metadata-container">
+                <div class="metadata">
+                    <div class="title" th:text="${activeSheet.title}"></div>
+                    <table>
+                        <tr th:if="${!#strings.isEmpty(activeSheet.author)}"><td th:text="#{author} + ':'"></td><td th:text="${activeSheet.author}"></td></tr>
+                        <tr th:if="${!#strings.isEmpty(activeSheet.otherAuthors)}"><td th:text="#{otherAuthors} + ':'"></td><td th:text="${activeSheet.otherAuthors}"></td></tr>
+                        <tr th:if="${!#strings.isEmpty(activeSheet.publisher)}"><td th:text="#{publisher} + ':'"></td><td th:text="${activeSheet.publisher}"></td></tr>
+                        <tr th:if="${!#strings.isEmpty(activeSheet.issue)}"><td th:text="#{issue} + ':'"></td><td th:text="${activeSheet.issue}"></td></tr>
+                        <tr th:if="${!#strings.isEmpty(activeSheet.description)}"><td th:text="#{physicalDescription} + ':'"></td><td th:text="${activeSheet.description}"></td></tr>
+                        <tr th:if="${!#strings.isEmpty(activeSheet.signature)}"><td th:text="#{signature} + ':'"></td><td th:text="${activeSheet.signature}"></td></tr>
+                        <tr>
+                            <td th:text="#{externalReferences} + ':'"></td>
+                            <td>
+                                <a th:if="${!#strings.isEmpty(activeSheet.vufindUrl)}" th:href="${activeSheet.vufindUrl}" class="no-anchor" target="_blank">VuFind</a>
+                                <span th:if="${!#strings.isEmpty(activeSheet.vufindUrl) and !#strings.isEmpty(activeSheet.digitalLibraryUrl)}">, </span>
+                                <a th:if="${!#strings.isEmpty(activeSheet.digitalLibraryUrl)}" th:href="${activeSheet.digitalLibraryUrl}" class="no-anchor" target="_blank" th:text="#{digitalLibrary}"></a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <script>window.sheet.main();</script>
+</div>
+
+<script>window.hoverable();</script>
+
+</body>
+</html>

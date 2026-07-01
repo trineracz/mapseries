@@ -171,8 +171,20 @@ public class UpdateEJB {
         Map<ContentDefinitionItem, SerieDAO> series = new HashMap<>();
         
         OaiMarcXmlReader oaiMarcXmlReader = new OaiMarcXmlReader("http://aleph.mzk.cz/OAI", "MZK01-MAPY");
-        
+
+        int harvestLimit = parseHarvestLimit();
+        int harvested = 0;
+
         for (MarcRecord marcRecord : oaiMarcXmlReader) {
+
+            // Optional cap for local testing: stop after N records so we don't
+            // pull the whole set from OAI. Controlled by env var
+            // MAPSERIES_HARVEST_LIMIT; unset/0 = no limit (production behavior).
+            if (harvestLimit > 0 && harvested >= harvestLimit) {
+                log.println("Reached MAPSERIES_HARVEST_LIMIT=" + harvestLimit + ", stopping harvest early (sample mode).");
+                break;
+            }
+            harvested++;
 
             Optional<ContentDefinitionItem> definition = findDefinitionForRecord(definitions, marcRecord);
             if (!definition.isPresent()) {
@@ -228,5 +240,18 @@ public class UpdateEJB {
                 .map(dataField -> dataField.getSubfield(marcId.getSubfields().get(0)))
                 .anyMatch(subfield -> subfield.isPresent() && subfield.get().equals(definition.getName()));
     }
-    
+
+    private int parseHarvestLimit() {
+        String value = cz.mzk.mapseries.Constants.getProperty("MAPSERIES_HARVEST_LIMIT");
+        if (value == null || value.trim().isEmpty()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            log.println("Invalid MAPSERIES_HARVEST_LIMIT '" + value + "', ignoring (no limit).");
+            return 0;
+        }
+    }
+
 }

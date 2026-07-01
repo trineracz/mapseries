@@ -13,3 +13,6 @@
 /edit/node_modules
 /presentation/nbproject/private/
 /presentation/target/
+
+# Local dev secrets (GitHub OAuth client id/secret for docker compose)
+.env

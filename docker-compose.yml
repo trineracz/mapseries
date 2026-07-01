@@ -1,18 +1,58 @@
-version: "2"
+# Local development stack: the WildFly app + its PostgreSQL database.
+# `version` is intentionally omitted — modern `docker compose` ignores it.
 services:
   mapseries:
     build: .
+    image: mapseries:dev
     restart: always
+    depends_on:
+      - postgres
     environment:
-      GITHUB_CLIENT_ID: ...
-      GITHUB_CLIENT_SECRET: ...
+      # Needed only for GitHub login / saving / triggering the harvest.
+      # Left empty for now — the app still starts and read-only viewing works.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      # Local testing: cap the harvest to N records (unset/empty = no limit).
+      MAPSERIES_HARVEST_LIMIT: ${MAPSERIES_HARVEST_LIMIT:-}
+      # Data source split: READ from the public production repo, WRITE to our fork
+      # so editing/admin saves never touch the library's production data.
+      MAPSERIES_REPO_USER: ${MAPSERIES_REPO_USER:-moravianlibrary}
+      MAPSERIES_REPO_WRITE_USER: ${MAPSERIES_REPO_WRITE_USER:-trineracz}
     ports:
-      - 8080:8080
-      - 8787:8787
+      - "8080:8080"   # the application
+      - "8787:8787"   # remote debugger (Java), unused for now
+
+  # New Spring Boot backend (replacement in progress). Runs on :8081 alongside the
+  # old WildFly app on :8080, against the SAME database, so we can compare them.
+  index-boot:
+    build: ./index-boot
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mapseries
+      SPRING_DATASOURCE_USERNAME: mapseries
+      SPRING_DATASOURCE_PASSWORD: mapseries
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      MAPSERIES_HARVEST_LIMIT: ${MAPSERIES_HARVEST_LIMIT:-0}
+      MAPSERIES_REPO_USER: ${MAPSERIES_REPO_USER:-moravianlibrary}
+      MAPSERIES_REPO_WRITE_USER: ${MAPSERIES_REPO_WRITE_USER:-trineracz}
+    ports:
+      - "8081:8080"   # the new app
+
   postgres:
     image: postgres:10
     restart: always
+    # These three auto-create exactly the user/database the app's datasource
+    # expects (see configs/standalone-full-mapseries.xml: user=mapseries,
+    # password=mapseries, db=mapseries on host "postgres").
     environment:
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: mapseries
+      POSTGRES_PASSWORD: mapseries
+      POSTGRES_DB: mapseries
     volumes:
-      - ...:/var/lib/postgresql/data:z
+      - mapseries-pgdata:/var/lib/postgresql/data
+
+volumes:
+  mapseries-pgdata:

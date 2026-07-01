@@ -8,9 +8,6 @@ import cz.mzk.mapseries.oai.marc.MarcRecord;
 import cz.mzk.mapseries.oai.marc.MarcTraversal;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
-import org.apache.commons.io.IOUtils;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.io.PrintStream;
 import java.net.HttpURLConnection;
@@ -24,6 +21,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.net.URLEncoder;
+import org.apache.commons.io.IOUtils;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  *
@@ -154,17 +155,17 @@ public class SheetBuilder {
     }
 
     private String getThumbnailUrlFromUuid(String uuid) {
-        Optional<String> childUuid = getFirstChildOfUuid(uuid);
-        String url;
+        // The record uuid is usually a monograph with no image of its own — the scan
+        // lives on its first page (child), so we IIIF that page (height THUMBNAIL_HEIGHT).
+        // Kramerius 7 removed the old per-item /children API, so the first child is now
+        // found via the search API (own_parent.pid). If the uuid has no children it is
+        // already a page and we IIIF it directly. (Legacy kramerius.mzk.cz is no longer
+        // redirected, hence the api.kramerius.mzk.cz host.)
+        String imageUuid = getFirstChildOfUuid(uuid).orElse(uuid);
+        String url = String.format("https://api.kramerius.mzk.cz/search/iiif/%s/full/,%s/0/default.jpg", imageUuid, THUMBNAIL_HEIGHT);
 
-        if (childUuid.isPresent()) {
-            url = String.format("https://kramerius.mzk.cz/search/iiif/%s/full/,%s/0/default.jpg", childUuid.get(), THUMBNAIL_HEIGHT);
-        } else {
-            url = String.format("https://kramerius.mzk.cz/search/api/v5.0/item/%s/thumb", uuid);
-        }
-        
         int code = checkUrl(url);
-        
+
         switch (code) {
             case 200: return url;
             case 403: return Constants.THUMBNAIL_COPYRIGHTED;
@@ -173,41 +174,28 @@ public class SheetBuilder {
     }
 
     private Optional<String> getFirstChildOfUuid(String uuid) {
-
         try {
-            URL url = new URL(String.format("https://kramerius.mzk.cz/search/api/v5.0/item/%s/children", uuid));
+            String fq = URLEncoder.encode(String.format("own_parent.pid:\"%s\"", uuid), "UTF-8");
+            URL url = new URL(String.format(
+                "https://api.kramerius.mzk.cz/search/api/client/v7.0/search?q=*:*&fq=%s&rows=1&fl=pid", fq));
+
             String content = IOUtils.toString(url);
-            JSONArray json = new JSONArray(content);
+            JSONArray docs = new JSONObject(content).getJSONObject("response").getJSONArray("docs");
 
-            if (json.length() == 0) {
-                // the API returned no children. Given uuid is already child uuid.
-                return Optional.of(uuid);
-            }
-
-            Object childObject = json.get(0);
-
-            if (!(childObject instanceof JSONObject)) {
-                log.println(String.format("Unexpected format of data.  Url: %s. Content: %s. MarcRecord: %s", url, content, marcRecord));
+            if (docs.length() == 0) {
+                // No children -> the uuid is already a page; caller IIIFs it directly.
                 return Optional.empty();
             }
 
-            JSONObject child = (JSONObject) childObject;
-
-            if (child.has("pid")) {
-                return Optional.of(child.getString("pid"));
-            } else {
-                log.println(String.format("Child has no pid key. Url: %s. Content: %s. MarcRecord: %s", url, content, marcRecord));
-                return Optional.empty();
-            }
+            return Optional.of(docs.getJSONObject(0).getString("pid"));
 
         } catch (Exception e) {
-            log.println("Exception thrown while getting uuid of first child. MarcRecord: " + marcRecord);
+            log.println("Exception while finding first child of " + uuid + ". MarcRecord: " + marcRecord);
             e.printStackTrace(log);
-
             return Optional.empty();
         }
     }
-    
+
     private int checkUrl(String urlParam) {
         try {
             URL url = new URL(urlParam);

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: headContent}"></head>
+<body>
+
+<th:block th:replace="~{fragments :: jsvars}"></th:block>
+
+<div id="map"></div>
+<script th:inline="javascript">
+    window.mapSettings = {};
+    window.mapSettings.serie = /*[[${serieName}]]*/ '';
+    window.mapSettings.grid = /*[[${grid}]]*/ '';
+    window.mapSettings.sheetIds = [(${sheetIdsJson})];
+    window.map.main();
+</script>
+
+<div th:replace="~{fragments :: panel}"></div>
+
+<div id="content"></div>
+
+<script>window.hoverable();</script>
+
+</body>
+</html>

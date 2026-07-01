@@ -1,0 +1,46 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: mapseries-server
+
+  # i18n bundle carried over from the old app (locale_cs / locale_en).
+  messages:
+    basename: cz.mzk.locales.locale
+    use-code-as-default-message: true
+    fallback-to-system-locale: false
+
+  # Same PostgreSQL the old app uses, so both run against one database and we can
+  # compare behaviour side by side. Overridable via env (compose sets the host).
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mapseries}
+    username: ${SPRING_DATASOURCE_USERNAME:mapseries}
+    password: ${SPRING_DATASOURCE_PASSWORD:mapseries}
+
+  jpa:
+    hibernate:
+      # 'update' keeps the existing schema; switch to 'validate' once the ported
+      # entities are confirmed to match the tables the old Hibernate created.
+      ddl-auto: update
+      naming:
+        # Map entity/field names as-is (e.g. SheetDAO#sheetId -> column "sheetid"),
+        # matching the legacy Hibernate 4 naming so we hit the SAME tables.
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    open-in-view: false
+
+# Repo split carried over from the old app: read from the public production repo,
+# write to our fork. Consumed by the ported GitHub service.
+mapseries:
+  repo:
+    read-user: ${MAPSERIES_REPO_USER:moravianlibrary}
+    read-name: ${MAPSERIES_REPO_NAME:mapseries-data}
+    write-user: ${MAPSERIES_REPO_WRITE_USER:trineracz}
+    write-name: ${MAPSERIES_REPO_WRITE_NAME:mapseries-data}
+  oai:
+    base-url: ${MAPSERIES_OAI_BASE_URL:http://aleph.mzk.cz/OAI}
+    set: ${MAPSERIES_OAI_SET:MZK01-MAPY}
+    harvest-limit: ${MAPSERIES_HARVEST_LIMIT:0}
+  github:
+    client-id: ${GITHUB_CLIENT_ID:}
+    client-secret: ${GITHUB_CLIENT_SECRET:}

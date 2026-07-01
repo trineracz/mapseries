@@ -1,5 +1,6 @@
 package cz.mzk.mapseries.github;
 
+import cz.mzk.mapseries.Constants;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -28,7 +29,7 @@ public class DataProxyServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
             String filePath = req.getPathInfo();
-            File repoPath = new File("/moravianlibrary/mapseries-data/master");
+            File repoPath = new File("/" + Constants.REPO_USER + "/" + Constants.REPO_NAME + "/master");
 
             URI githubUri = new URIBuilder()
                     .setScheme("https")

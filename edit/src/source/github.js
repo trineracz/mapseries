@@ -4,7 +4,10 @@ var GitHub = require('github-api'),
 module.exports = function(context, config) {
 
   config = config || {};
-  var username = config.username || 'moravianlibrary';
+  // Upstream = the repo we fork from and send pull requests to. Defaults to our
+  // fork (trineracz) so editing never writes to the library's production repo.
+  // Override via config.username when wiring this up for real deployment.
+  var username = config.username || 'trineracz';
   var reponame = config.reponame || 'mapseries-data';
   var workBranch = config.workBranch || 'work';
 

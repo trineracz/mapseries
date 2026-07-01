@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head th:fragment="headContent">
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Mapseries</title>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/main.css}"/>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/languages.min.css}"/>
+    <script type="text/javascript" th:src="@{/assets/main.js}"></script>
+</head>
+
+<body>
+
+<th:block th:fragment="jsvars">
+    <script th:inline="javascript">
+        window.contextPath = "";
+        window.msg = {
+            changesNotSaved: /*[[#{changesNotSaved}]]*/ '',
+            error: /*[[#{error}]]*/ ''
+        };
+        window.msg.contentSettings = {
+            field: /*[[#{contentSettings.field}]]*/ '',
+            name: /*[[#{contentSettings.name}]]*/ '',
+            grid: /*[[#{contentSettings.grid}]]*/ '',
+            sheets: /*[[#{contentSettings.sheets}]]*/ '',
+            groupby: /*[[#{contentSettings.groupby}]]*/ '',
+            thumbnailUrl: /*[[#{contentSettings.thumbnailUrl}]]*/ '',
+            commitMsgDialogTitle: /*[[#{contentSettings.commitMsgDialogTitle}]]*/ '',
+            commitMsgCannotBeEmpty: /*[[#{contentSettings.commitMsgCannotBeEmpty}]]*/ ''
+        };
+        window.msg.usersSettings = {
+            addAdminDialogTitle: /*[[#{usersSettings.addAdminDialogTitle}]]*/ '',
+            adminCannotBeEmpty: /*[[#{usersSettings.adminCannotBeEmpty}]]*/ '',
+            removeAdminDialogTitle: /*[[#{usersSettings.removeAdminDialogTitle}]]*/ ''
+        };
+    </script>
+</th:block>
+
+<div th:fragment="panel" class="container right-panel">
+    <div class="row justify-content-between content-between red">
+        <div class="logo">
+            <a href="https://www.mzk.cz/" class="no-anchor" target="_blank">
+                <img th:src="'/assets/' + #{mzkLogoSrc}"/>
+            </a>
+        </div>
+        <select id="lang-switcher" class="languages custom-select" autocomplete="off">
+            <option th:value="${#locale.language}" selected="selected" th:text="#{__${#locale.language}__}"></option>
+            <option th:each="l : ${ {'cs','en'} }" th:if="${l != #locale.language}"
+                    th:value="${l}" th:text="#{__${l}__}"></option>
+        </select>
+    </div>
+    <div class="row justify-content-end content-end red">
+        <a th:href="@{/}"><div class="title" th:text="#{applicationTitle}"></div></a>
+    </div>
+    <div class="row justify-content-end content-end red">
+        <div class="subtitle" th:text="#{applicationSubTitle}"></div>
+    </div>
+    <div class="row justify-content-end content-end red">
+        <div class="search-label" th:text="#{search-label} + ':'"></div>
+    </div>
+    <div class="row justify-content-end content-end red">
+        <input id="search-location" type="text" class="search-input form-control right mb-4 mt-2"/>
+    </div>
+
+    <div class="row">
+        <ul class="nav nav-tabs nav-fill" role="tablist">
+            <li class="nav-item"><a id="main-tab" class="nav-link active" data-toggle="tab" href="#main" data-target="#main" role="tab" aria-controls="main" aria-selected="true" th:text="#{list}"></a></li>
+            <li class="nav-item"><a id="about-tab" class="nav-link" data-toggle="tab" href="#about" data-target="#about" role="tab" aria-controls="about" aria-selected="false" th:text="#{applicationTitle}"></a></li>
+            <li class="nav-item"><a id="help-tab" class="nav-link" data-toggle="tab" href="#help" data-target="#help" role="tab" aria-controls="help" aria-selected="false" th:text="#{help}"></a></li>
+        </ul>
+    </div>
+
+    <div class="row tab-pane fade show active justify-content-start content-start padding black" id="main" role="tabpanel" aria-labelledby="main-tab">
+        <div class="row mt-4"><h2 th:text="#{choose-serie} + ':'"></h2></div>
+        <div class="row serie hoverable" th:each="serie : ${series}"
+             th:classappend="${serie.name == activeSerie} ? 'active' : 'inactive'" th:attr="data-ref=${serie.name}">
+            <div class="underlay"></div>
+            <a th:href="@{/map.xhtml(serie=${serie.name})}">
+                <span th:utext="'— ' + ${serie.nameHtml}"></span>
+            </a>
+            <div class="description" th:if="${serie.name == activeSerie}" th:text="${serieDescription}"></div>
+        </div>
+    </div>
+    <div class="row tab-pane fade justify-content-start content-start black" id="about" role="tabpanel" aria-labelledby="about-tab">
+        <div class="col"><div class="row tab-text my-4" th:utext="#{about.text}"></div></div>
+    </div>
+    <div class="row tab-pane fade justify-content-start content-start black" id="help" role="tabpanel" aria-labelledby="help-tab">
+        <div class="col"><div class="row tab-text my-4" th:utext="#{help.text}"></div></div>
+    </div>
+    <div class="row tab-pane fade justify-content-start content-start black" id="authors" role="tabpanel" aria-labelledby="authors-tab">
+        <div class="col"><div class="row tab-text my-4" th:utext="#{authors.text}"></div></div>
+    </div>
+    <div class="row black" id="pannel-padding"></div>
+    <div class="black" id="footer">
+        <div class="row">
+            <div class="col text-center"><a href="/catalog" class="align-middle no-anchor" target="_blank" th:text="#{mapseries-catalog}"></a><span class="separator">|</span></div>
+            <div class="col text-center"><a href="https://moravianlibrary.github.io/scale-calculator/" class="align-middle no-anchor" target="_blank" th:text="#{scale-calculator}"></a></div>
+        </div>
+        <div class="row">
+            <div class="col-3 text-center nav"><a id="authors-tab" href="#authors" data-target="#authors" class="align-middle no-anchor" data-toggle="tab" aria-selected="false" role="tab" aria-controls="authors" th:text="#{authors}"></a><span class="separator">|</span></div>
+            <div class="col-3 text-center"><a href="/admin/index.xhtml" class="align-middle no-anchor" th:text="#{admin}"></a><span class="separator">|</span></div>
+            <div class="col-6 text-center"><span class="text">&copy;</span> <a href="https://www.mzk.cz/" class="align-middle no-anchor" target="_blank">MZK</a><span class="text">,</span> <a href="https://www.openstreetmap.org/" class="align-middle no-anchor" target="_blank">OpenStreetMap</a></div>
+        </div>
+    </div>
+    <script th:inline="javascript">
+        window.langUrls = [(${langUrlsJson})];
+        window.rightPanel.main();
+    </script>
+</div>
+
+</body>
+</html>

@@ -1,4 +1,4 @@
-FROM jboss/wildfly:16.0.0.Final
+FROM --platform=linux/amd64 jboss/wildfly:16.0.0.Final
 
 COPY scripts /scripts
 COPY configs /configs
