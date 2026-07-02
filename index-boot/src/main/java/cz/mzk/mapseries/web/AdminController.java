@@ -6,6 +6,7 @@ import cz.mzk.mapseries.github.AuthService;
 import cz.mzk.mapseries.repository.AdminRepository;
 import cz.mzk.mapseries.repository.CurrentVersionRepository;
 import cz.mzk.mapseries.repository.UpdateTaskRepository;
+import cz.mzk.mapseries.update.HarvestService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -33,23 +34,43 @@ public class AdminController {
     private final CurrentVersionRepository currentVersionRepository;
     private final AdminRepository adminRepository;
     private final DataAnalyzer dataAnalyzer;
+    private final HarvestService harvestService;
     private final MapseriesProperties props;
 
     public AdminController(AuthService authService, UpdateTaskRepository updateTaskRepository,
                           CurrentVersionRepository currentVersionRepository, AdminRepository adminRepository,
-                          DataAnalyzer dataAnalyzer, MapseriesProperties props) {
+                          DataAnalyzer dataAnalyzer, HarvestService harvestService, MapseriesProperties props) {
         this.authService = authService;
         this.updateTaskRepository = updateTaskRepository;
         this.currentVersionRepository = currentVersionRepository;
         this.adminRepository = adminRepository;
         this.dataAnalyzer = dataAnalyzer;
+        this.harvestService = harvestService;
         this.props = props;
     }
 
-    @GetMapping({"/admin", "/admin/index.xhtml"})
+    @GetMapping("/admin")
     public String adminRoot() {
-        // Content-settings page not ported yet — land on the Update page.
-        return "redirect:/admin/update.xhtml";
+        return "redirect:/admin/index.xhtml";
+    }
+
+    @GetMapping("/admin/index.xhtml")
+    public String index(@RequestParam(required = false) String code, Model model, HttpServletRequest request) {
+        if (code != null && !code.isBlank()) {
+            authService.authenticate(code);
+            return "redirect:/admin/index.xhtml";
+        }
+
+        boolean admin = authService.isAuthenticated() && authService.isAdmin();
+        model.addAttribute("authenticated", authService.isAuthenticated());
+        model.addAttribute("admin", admin);
+        model.addAttribute("activeMenuItem", "index");
+        model.addAttribute("authUrl", authUrl(request));
+
+        if (admin) {
+            model.addAttribute("contentDefinitionData", harvestService.loadContentDefinition());
+        }
+        return "admin/index";
     }
 
     @GetMapping("/admin/update.xhtml")

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="buttons">
+                <button id="btn-save" class="btn btn-danger" disabled="true"
+                        onclick="window.contentSettings.onSaveClick()" th:text="#{save}"></button>
+                <button class="btn btn-default" onclick="window.contentSettings.onRestoreClick()"
+                        th:text="#{restore}"></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="content-settings-table-scrolling-container">
+        <div id="content-settings-table"></div>
+    </div>
+
+    <script th:inline="javascript">
+        window.contentDefinitionData = [(${contentDefinitionData})];
+        window.contentSettings.main();
+    </script>
+
+</div>
+</body>
+</html>
