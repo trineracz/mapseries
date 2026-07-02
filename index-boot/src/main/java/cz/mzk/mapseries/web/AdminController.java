@@ -3,6 +3,7 @@ package cz.mzk.mapseries.web;
 import cz.mzk.mapseries.admin.DataAnalyzer;
 import cz.mzk.mapseries.config.MapseriesProperties;
 import cz.mzk.mapseries.github.AuthService;
+import cz.mzk.mapseries.managers.ContentDefinitionManager;
 import cz.mzk.mapseries.repository.AdminRepository;
 import cz.mzk.mapseries.repository.CurrentVersionRepository;
 import cz.mzk.mapseries.repository.UpdateTaskRepository;
@@ -154,6 +155,56 @@ public class AdminController {
             model.addAttribute("nonLinkedMaps", dataAnalyzer.getNonLinkedMaps());
         }
         return "admin/non-linked-maps";
+    }
+
+    @GetMapping("/admin/texts.xhtml")
+    public String texts(@RequestParam(required = false) String code, Model model, HttpServletRequest request) {
+        if (code != null && !code.isBlank()) {
+            authService.authenticate(code);
+            return "redirect:/admin/texts.xhtml";
+        }
+        boolean admin = authService.isAuthenticated() && authService.isAdmin();
+        model.addAttribute("authenticated", authService.isAuthenticated());
+        model.addAttribute("admin", admin);
+        model.addAttribute("activeMenuItem", "texts");
+        model.addAttribute("authUrl", authUrl(request));
+
+        if (admin) {
+            model.addAttribute("definitions", loadDefinitions());
+            model.addAttribute("languages", List.of("cs", "en"));
+        }
+        return "admin/texts";
+    }
+
+    @GetMapping("/admin/text-editor.xhtml")
+    public String textEditor(@RequestParam(name = "text-lang", required = false, defaultValue = "cs") String textLang,
+                             @RequestParam(name = "text-name", required = false, defaultValue = "") String textName,
+                             @RequestParam(required = false) String code, Model model, HttpServletRequest request) {
+        if (code != null && !code.isBlank()) {
+            authService.authenticate(code);
+            return "redirect:/admin/text-editor.xhtml?text-lang=" + enc(textLang) + "&text-name=" + enc(textName);
+        }
+        boolean admin = authService.isAuthenticated() && authService.isAdmin();
+        model.addAttribute("authenticated", authService.isAuthenticated());
+        model.addAttribute("admin", admin);
+        model.addAttribute("activeMenuItem", "texts");
+        model.addAttribute("authUrl", authUrl(request));
+
+        if (admin) {
+            String json = harvestService.loadContentDefinition();
+            var item = ContentDefinitionManager.fromJsonString(json).getDefinitions().stream()
+                    .filter(d -> d.getName().equals(textName)).findFirst().orElse(null);
+            model.addAttribute("contentDefinitionData", json);
+            model.addAttribute("textLang", textLang);
+            model.addAttribute("textName", textName);
+            model.addAttribute("prettyName", item != null ? item.getPrettyName() : textName);
+            model.addAttribute("text", item != null ? item.getDescription(textLang).orElse("") : "");
+        }
+        return "admin/text-editor";
+    }
+
+    private List<cz.mzk.mapseries.managers.ContentDefinitionItem> loadDefinitions() {
+        return ContentDefinitionManager.fromJsonString(harvestService.loadContentDefinition()).getDefinitions();
     }
 
     @GetMapping("/logout")

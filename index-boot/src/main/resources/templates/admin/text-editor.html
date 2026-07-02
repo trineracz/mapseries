@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+
+    <div class="container-fluid">
+        <h1 class="mb-4"><span th:text="${prettyName}"></span>: <span th:text="#{__${textLang}__}"></span></h1>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="buttons">
+                    <button id="btn-save" class="btn btn-danger" disabled="true"
+                            onclick="window.textEditor.onSaveClick()" th:text="#{save}"></button>
+                    <button class="btn btn-default" onclick="window.textEditor.onRestoreClick()"
+                            th:text="#{restore}"></button>
+                    <a class="btn btn-primary" th:href="@{/admin/texts.xhtml}" th:text="#{back}"></a>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <textarea class="form-control" id="text-input" th:text="${text}"></textarea>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        window.contentDefinitionData = [(${contentDefinitionData})];
+        window.textEditor.lang = /*[[${textLang}]]*/ '';
+        window.textEditor.name = /*[[${textName}]]*/ '';
+        window.textEditor.main();
+    </script>
+
+</div>
+</body>
+</html>

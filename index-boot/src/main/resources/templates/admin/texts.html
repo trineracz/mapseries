@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+
+    <div class="container-fluid">
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item" th:each="definition : ${definitions}">
+                <span th:text="${definition.prettyName}"></span>
+                <a th:each="lang : ${languages}"
+                   th:classappend="${definition.getDescription(lang).isPresent()} ? 'btn-info' : 'btn-danger'"
+                   class="float-right mx-1 btn btn-sm"
+                   th:href="@{/admin/text-editor.xhtml(text-lang=${lang},text-name=${definition.name})}"
+                   th:text="#{__${lang}__}"></a>
+            </li>
+        </ul>
+    </div>
+
+</div>
+</body>
+</html>
