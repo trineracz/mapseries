@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Map Series</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="author" content="Petr Pridal - Klokan Technologies GmbH">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta http-equiv="X-UA-Compatible" content="IE=8">
+    <script src="/server/data/config.js"></script>
+    <script>
+      COMPILED=false;
+      window.mapseries = mapseries;
+    </script>
+    <script src="main.js"></script>
+    <link href="main.css" media="all" rel="stylesheet" type="text/css" />
+
+    <!-- Google Tag Manager -->
+    <script>
+    (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-MBZGH4');
+    </script>
+    <!-- End Google Tag Manager -->
+
+  </head>
+  <body>
+    <div class="container right-panel">
+      <div class="row justify-content-between green">
+        <div class="logo">
+          <a href="https://www.mzk.cz/" target="_blank"><img data-text-ref="mzk-logo-src" data-text-target="src" width="90px"></a>
+        </div>
+        <select id="lang-switcher" class="languages custom-select">
+          <option value="cs">CZ</option>
+          <option value="en">EN</option>
+        </select>
+      </div>
+      <div class="row justify-content-end green">
+        <div data-text-ref="title" class="title"></div>
+      </div>
+      <div class="row justify-content-end green">
+        <div data-text-ref="subtitle" class="subtitle"></div>
+      </div>
+      <div class="row justify-content-end green">
+        <div data-text-ref="search-label" class="search-label"></div>
+      </div>
+      <div class="row justify-content-end green">
+        <input id="search-location" type="text" class="search-input form-control right mb-4 mt-2">
+      </div>
+
+      <div class="row">
+        <ul class="nav nav-tabs nav-fill" role="tablist">
+          <li class="nav-item">
+            <a data-text-ref="tab-main" id="main-tab" class="nav-link active" data-toggle="tab" href="#main" role="tab" aria-controls="main" aria-selected="true"></a>
+          </li>
+          <li class="nav-item">
+            <a data-text-ref="tab-about" id="about-tab" class="nav-link" data-toggle="tab" href="#about" role="tab" aria-controls="about" aria-selected="false"></a>
+          </li>
+          <li class="nav-item">
+            <a data-text-ref="tab-help" id="help-tab" class="nav-link" data-toggle="tab" href="#help" role="tab" aria-controls="help" aria-selected="false"></a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="row tab-pane fade show active justify-content-start black" id="main" role="tabpanel" aria-labelledby="main-tab">
+        <div class="col">
+          <div data-text-ref="choose-serie" class="row subtitle my-2"></div>
+          <div data-text-ref="filter-region" class="row label my-1"></div>
+          <div class="row">
+            <select id="regionSelect" class="custom-select white black-bg wide mb-3"></select>
+          </div>
+          <div data-text-ref="filter-grid" class="row label my-1"></div>
+          <div class="row">
+            <select id="gridSelect" class="custom-select white black-bg wide mt-1 mb-3"></select>
+          </div>
+          <div data-text-ref="choose-serie" class="row label my-1"></div>
+          <div class="row">
+            <select id="seriesSelect" class="custom-select white black-bg wide mt-1 mb-3"></select>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="row tab-pane fade justify-content-start black" id="about" role="tabpanel" aria-labelledby="about-tab">
+        <div class="col">
+          <div class="row tab-text my-4" data-text-ref="about-text"></div>
+        </div>
+      </div>
+      <div class="row tab-pane fade justify-content-start black" id="help" role="tabpanel" aria-labelledby="help-tab">
+        <div class="col">
+          <div class="row tab-text my-4" data-text-ref="help-text"></div>
+        </div>
+      </div>
+
+
+      <div class="row tab-pane fade justify-content-start black" id="authors" role="tabpanel" aria-labelledby="authors-tab">
+        <div class="col">
+          <div class="row tab-text my-4" data-text-ref="authors-text"></div>
+        </div>
+      </div>
+      <div class="row black" id="pannel-padding"></div>
+      <div class="black" id="footer">
+        <div class="row">
+          <div class="col text-center">
+            <a href="http://mapseries.mzk.cz" target="_blank" class="align-middle" data-text-ref="mapseries-online"></a>
+            <span class="separator">|</span>
+          </div>
+          <div class="col text-center">
+            <a href="https://mapy.mzk.cz/scale-calculator" target="_blank" class="align-middle" data-text-ref="scale-calculator"></a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-3 text-center nav">
+            <a id="authors-tab" href="#authors" class="align-middle" data-text-ref="authors" data-toggle="tab" aria-selected="false" role="tab" aria-controls="authors"></a>
+            <span class="separator">|</span>
+          </div>
+          <div class="col-3 text-center">
+              <a id="edit-bttn" href="#" target="_blank" class="align-middle no-anchor" data-text-ref="admin"></a>
+              <span class="separator">|</span>
+          </div>
+          <div class="col-6 text-center">
+            <span>©</span>
+            <a href="https://www.mzk.cz/" target="_blank">MZK</a>
+            <span>,</span>
+            <a href="https://www.openstreetmap.org/" target="_blank" data-text-ref="openstreetmap"></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="map"></div>
+    <script>main()</script>
+  </body>
+</html>

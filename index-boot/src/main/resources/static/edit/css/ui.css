@@ -1,0 +1,120 @@
+.radio-box span.other {
+  display: inline-block;
+  width: 94%;
+  white-space: nowrap;
+}
+
+.radio-box .vertical-scroll {
+  height: 160px;
+  overflow-y: scroll;
+}
+
+#loading {
+  display: none;
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  top: 0px;
+  bottom: 0px;
+  z-index: 10000;
+  background-image: url('../img/ajax-loader.gif');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: white;
+  opacity: 0.7;
+  filter: alpha(opacity=70);
+}
+
+.item.disabled {
+  pointer-events: none;
+}
+
+.item.disabled a {
+  color: gray;
+  pointer-events: none;
+}
+
+.editor-container button.disabled {
+  pointer-events: none !important;
+  background-color: gray !important;
+}
+
+.controls button, .editor-container a.control {
+  background-color: #EEE;
+  padding: 5px;
+  border-radius: 3px;
+}
+
+.controls button:hover, .editor-container a.control:hover {
+  background-color: #f7f7f7;
+}
+
+.editor-container a.control {
+  display: block;
+  float: left;
+  margin: 10px;
+  padding: 5px;
+  color: black;
+}
+
+.editor-container button.toolbar:hover {
+  background-color: #2980b9
+}
+
+.editor-container button.toolbar {
+  background-color: #34495E;
+  color: white;
+  padding: 5px;
+  border-radius: 3px;
+  margin: 10px;
+}
+
+.editor .CodeMirror {
+  top: 95px;
+  border-top: 1px solid #D3D3D3;
+}
+
+.editor .editor-table {
+  overflow: hidden;
+  position: absolute;
+  top: 95px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.leaflet-draw-section, .leaflet-control-grid-container {
+  display: none;
+}
+
+.handsontable td {
+  word-break: break-all;
+}
+
+.icon-edit {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg%20version%3D%221.1%22%20id%3D%22Capa_1%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20xmlns%3Axlink%3D%22http%3A%2F%2Fwww.w3.org%2F1999%2Fxlink%22%20x%3D%220px%22%20y%3D%220px%22%20width%3D%22563.234px%22%20height%3D%22563.234px%22%20viewBox%3D%220%200%20563.234%20563.234%22%20style%3D%22enable-background%3Anew%200%200%20563.234%20563.234%3B%22%20xml%3Aspace%3D%22preserve%22%3E%20%3Cg%3E%20%3Cg%3E%20%3Cpath%20d%3D%22M416.16%2C335.148v123.949H61.2v-354.96h354.96v40.6l0.275-0.275l0.514-0.514l12.981-12.98l16.823-16.824l28.587-28.586%20c-6.561-24.504-28.893-42.62-55.429-42.62H57.449C25.771%2C42.938%2C0%2C68.709%2C0%2C100.386V462.85c0%2C31.676%2C25.771%2C57.447%2C57.449%2C57.447%20h362.463c31.677%2C0%2C57.448-25.771%2C57.448-57.447v-188.9l-30.601%2C30.6L416.16%2C335.148z%22%2F%3E%20%3Cpolygon%20points%3D%22446.76%2C174.787%20429.422%2C157.443%20416.16%2C170.705%20233.674%2C353.191%20223.294%2C432.812%20302.916%2C422.434%20416.16%2C309.182%20446.76%2C278.582%20477.36%2C247.982%20498.658%2C226.685%20477.36%2C205.387%20%22%2F%3E%20%3Cpath%20d%3D%22M507.825%2C96.353c-2.325-2.332-5.397-3.488-8.513-3.488c-3.274%2C0-6.598%2C1.285-9.144%2C3.831l-12.809%2C12.809l-30.601%2C30.6%20l-3.843%2C3.843l3.843%2C3.843l30.601%2C30.6l34.798%2C34.798l47.247-47.247c4.969-4.969%2C5.122-12.876%2C0.343-17.656L507.825%2C96.353z%22%2F%3E%20%3C%2Fg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3C%2Fg%3E%20%3C%2Fsvg%3E%20");
+}
+
+.icon-confirm {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg%20version%3D%221.1%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20xmlns%3Axlink%3D%22http%3A%2F%2Fwww.w3.org%2F1999%2Fxlink%22%20x%3D%220px%22%20y%3D%220px%22%20width%3D%221000px%22%20height%3D%221000px%22%20viewBox%3D%220%200%201000%201000%22%20style%3D%22enable-background%3Anew%200%200%201000%201000%3B%22%20xml%3Aspace%3D%22preserve%22%3E%0A%3Cmetadata%3E%20Svg%20Vector%20Icons%20%3A%20http%3A%2F%2Fwww.onlinewebfonts.com%2Ficon%20%3C%2Fmetadata%3E%0A%3Cg%3E%3Cpath%20d%3D%22M322.1%2C714.1L91.7%2C483.3L10%2C561.2l312.1%2C311.4L990%2C205.2l-81.7-77.9L322.1%2C714.1z%22%2F%3E%3C%2Fg%3E%0A%3C%2Fsvg%3E");
+  background-size: 70% 70%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.icon-cancel {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg%20version%3D%221.1%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20xmlns%3Axlink%3D%22http%3A%2F%2Fwww.w3.org%2F1999%2Fxlink%22%20x%3D%220px%22%20y%3D%220px%22%20width%3D%221000px%22%20height%3D%221000px%22%20viewBox%3D%220%200%201000%201000%22%20enable-background%3D%22new%200%200%201000%201000%22%20xml%3Aspace%3D%22preserve%22%3E%0A%3Cmetadata%3E%20Svg%20Vector%20Icons%20%3A%20http%3A%2F%2Fwww.onlinewebfonts.com%2Ficon%20%3C%2Fmetadata%3E%0A%3Cg%3E%3Cpath%20d%3D%22M990%2C826.7L663.3%2C500.1L990%2C173.3L826.7%2C9.9L500%2C336.7L173.3%2C9.9L10%2C173.3l326.7%2C326.8L10%2C826.7l163.3%2C163.3L500%2C663.4l326.7%2C326.7L990%2C826.7z%22%2F%3E%3C%2Fg%3E%0A%3C%2Fsvg%3E");
+  background-size: 50% 50%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.icon-grid {
+  background-image: url('../img/grid.png');
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.ui-front {
+  z-index: 100000;
+}
