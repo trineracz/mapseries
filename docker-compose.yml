@@ -19,11 +19,10 @@ services:
       MAPSERIES_REPO_USER: ${MAPSERIES_REPO_USER:-moravianlibrary}
       MAPSERIES_REPO_WRITE_USER: ${MAPSERIES_REPO_WRITE_USER:-trineracz}
     ports:
-      - "8080:8080"   # the application
-      - "8787:8787"   # remote debugger (Java), unused for now
+      - "8081:8080"   # OLD WildFly app, now parked on :8081 as a comparison oracle
 
-  # New Spring Boot backend (replacement in progress). Runs on :8081 alongside the
-  # old WildFly app on :8080, against the SAME database, so we can compare them.
+  # New Spring Boot backend — now the PRIMARY app on :8080 (so the GitHub OAuth
+  # callback registered for :8080 works). Serves everything the old app did.
   index-boot:
     build: ./index-boot
     restart: always
@@ -39,7 +38,7 @@ services:
       MAPSERIES_REPO_USER: ${MAPSERIES_REPO_USER:-moravianlibrary}
       MAPSERIES_REPO_WRITE_USER: ${MAPSERIES_REPO_WRITE_USER:-trineracz}
     ports:
-      - "8081:8080"   # the new app
+      - "8080:8080"   # the new app is now primary on :8080
 
   postgres:
     image: postgres:10
