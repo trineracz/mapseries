@@ -146,7 +146,7 @@ public class AdminController {
         return "https://github.com/login/oauth/authorize"
                 + "?client_id=" + enc(props.github().clientId())
                 + "&redirect_uri=" + enc(redirect)
-                + "&scope=" + enc("user:email public_repo");
+                + "&scope=" + enc("user:email repo");
     }
 
     private List<TaskRow> taskRows(long current) {
