@@ -2,6 +2,7 @@ package cz.mzk.mapseries.web;
 
 import cz.mzk.mapseries.config.MapseriesProperties;
 import cz.mzk.mapseries.github.AuthService;
+import cz.mzk.mapseries.repository.AdminRepository;
 import cz.mzk.mapseries.repository.CurrentVersionRepository;
 import cz.mzk.mapseries.repository.UpdateTaskRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,13 +30,16 @@ public class AdminController {
     private final AuthService authService;
     private final UpdateTaskRepository updateTaskRepository;
     private final CurrentVersionRepository currentVersionRepository;
+    private final AdminRepository adminRepository;
     private final MapseriesProperties props;
 
     public AdminController(AuthService authService, UpdateTaskRepository updateTaskRepository,
-                          CurrentVersionRepository currentVersionRepository, MapseriesProperties props) {
+                          CurrentVersionRepository currentVersionRepository, AdminRepository adminRepository,
+                          MapseriesProperties props) {
         this.authService = authService;
         this.updateTaskRepository = updateTaskRepository;
         this.currentVersionRepository = currentVersionRepository;
+        this.adminRepository = adminRepository;
         this.props = props;
     }
 
@@ -64,6 +68,49 @@ public class AdminController {
             model.addAttribute("tasks", taskRows(current));
         }
         return "admin/update";
+    }
+
+    @GetMapping("/admin/update-log.xhtml")
+    public String updateLog(@RequestParam long task, @RequestParam(required = false) String code,
+                            Model model, HttpServletRequest request) {
+        if (code != null && !code.isBlank()) {
+            authService.authenticate(code);
+            return "redirect:/admin/update-log.xhtml?task=" + task;
+        }
+
+        boolean admin = authService.isAuthenticated() && authService.isAdmin();
+        model.addAttribute("authenticated", authService.isAuthenticated());
+        model.addAttribute("admin", admin);
+        model.addAttribute("activeMenuItem", "update");
+        model.addAttribute("authUrl", authUrl(request));
+        model.addAttribute("taskId", task);
+
+        if (admin) {
+            var updateTask = updateTaskRepository.findById(task).orElse(null);
+            model.addAttribute("task", updateTask);
+            model.addAttribute("log", updateTask != null ? updateTask.getLog() : null);
+        }
+        return "admin/update-log";
+    }
+
+    @GetMapping("/admin/users.xhtml")
+    public String users(@RequestParam(required = false) String code, Model model, HttpServletRequest request) {
+        if (code != null && !code.isBlank()) {
+            authService.authenticate(code);
+            return "redirect:/admin/users.xhtml";
+        }
+
+        boolean admin = authService.isAuthenticated() && authService.isAdmin();
+        model.addAttribute("authenticated", authService.isAuthenticated());
+        model.addAttribute("admin", admin);
+        model.addAttribute("activeMenuItem", "users");
+        model.addAttribute("authUrl", authUrl(request));
+
+        if (admin) {
+            model.addAttribute("admins", adminRepository.findAll());
+            model.addAttribute("currentLogin", authService.getLogin());
+        }
+        return "admin/users";
     }
 
     @GetMapping("/logout")

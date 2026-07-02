@@ -1,7 +1,10 @@
 package cz.mzk.mapseries.web;
 
+import cz.mzk.mapseries.dao.AdminDAO;
+import cz.mzk.mapseries.repository.AdminRepository;
 import cz.mzk.mapseries.update.HarvestExecutor;
 import cz.mzk.mapseries.update.HarvestService;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,10 +22,13 @@ public class AjaxRestController {
 
     private final HarvestService harvestService;
     private final HarvestExecutor harvestExecutor;
+    private final AdminRepository adminRepository;
 
-    public AjaxRestController(HarvestService harvestService, HarvestExecutor harvestExecutor) {
+    public AjaxRestController(HarvestService harvestService, HarvestExecutor harvestExecutor,
+                              AdminRepository adminRepository) {
         this.harvestService = harvestService;
         this.harvestExecutor = harvestExecutor;
+        this.adminRepository = adminRepository;
     }
 
     @RequestMapping("/updateSettings/updateAction")
@@ -38,6 +44,22 @@ public class AjaxRestController {
     @RequestMapping("/updateSettings/restoreVersion")
     public Map<String, Object> restoreVersion(@RequestParam long version) {
         harvestService.restoreVersion(version);
+        return result(true, "");
+    }
+
+    @RequestMapping("/usersSettings/addAdmin")
+    @Transactional
+    public Map<String, Object> addAdmin(@RequestParam String adminName) {
+        AdminDAO admin = new AdminDAO();
+        admin.setName(adminName);
+        adminRepository.save(admin);
+        return result(true, "");
+    }
+
+    @RequestMapping("/usersSettings/removeAdmin")
+    @Transactional
+    public Map<String, Object> removeAdmin(@RequestParam String adminName) {
+        adminRepository.deleteById(adminName);
         return result(true, "");
     }
 

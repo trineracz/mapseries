@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="buttons">
+                <a class="btn btn-primary" th:href="@{/admin/update.xhtml}" th:text="#{back}"></a>
+                <button class="btn btn-warning" onclick="tools.clip('log');" th:text="#{markText}"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <h3><span th:text="#{updateTask}"></span> <span th:text="${taskId}"></span></h3>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <p th:if="${task == null}">
+                <span th:text="#{updateTask}"></span> <span th:text="#{withId}"></span>
+                <span th:text="${taskId}"></span> <span th:text="#{doesNotExist}"></span>.
+            </p>
+            <pre id="log" th:if="${task != null and (log == null or log.isEmpty())}" th:text="#{logNotAvailable}"></pre>
+            <pre id="log" th:if="${task != null and log != null and !log.isEmpty()}" th:text="${log}"></pre>
+        </div>
+    </div>
+
+    <script>window.admin.log();</script>
+
+</div>
+</body>
+</html>

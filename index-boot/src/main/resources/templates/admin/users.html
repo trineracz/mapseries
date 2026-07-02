@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="buttons">
+                <button class="btn btn-danger" onclick="window.usersSettings.onAddAdminClick()"
+                        th:text="#{usersSettings.addAdmin}"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <table class="table">
+                <tr>
+                    <th th:text="#{usersSettings.admin}"></th>
+                </tr>
+                <tr th:each="admin : ${admins}">
+                    <td>
+                        <span th:text="${admin.name}"></span>
+                        <button th:if="${admin.name != currentLogin}" type="button"
+                                class="btn btn-link float-right no-padding"
+                                th:onclick="'window.usersSettings.onRemoveAdminClick(\'' + ${admin.name} + '\')'">
+                            <i class="fas fa-ban" style="color: #dc3545;"></i>
+                        </button>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>
