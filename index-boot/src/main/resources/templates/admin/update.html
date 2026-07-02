@@ -64,6 +64,20 @@
             </div>
 
             <script>window.updateSettings.main();</script>
+
+            <!-- Auto-refresh while a harvest runs (replaces the old /ws/update WebSocket). -->
+            <script th:inline="javascript">
+                if (/*[[${harvestRunning}]]*/ false) {
+                    setInterval(function () {
+                        fetch('/api/harvest/tasks').then(function (r) { return r.json(); }).then(function (tasks) {
+                            var running = tasks.some(function (t) {
+                                return t.startDate && t.startDate !== 'null' && (!t.endDate || t.endDate === 'null');
+                            });
+                            if (!running) { location.reload(); }
+                        });
+                    }, 3000);
+                }
+            </script>
         </div>
 
     </div>

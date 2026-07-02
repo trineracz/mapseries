@@ -95,8 +95,11 @@ public class AdminController {
 
         if (admin) {
             long current = currentVersionRepository.findCurrentVersion().orElse(0L);
+            List<TaskRow> tasks = taskRows(current);
             model.addAttribute("currentVersion", current);
-            model.addAttribute("tasks", taskRows(current));
+            model.addAttribute("tasks", tasks);
+            model.addAttribute("harvestRunning",
+                    tasks.stream().anyMatch(t -> t.status().equals("running") || t.status().equals("scheduled")));
         }
         return "admin/update";
     }
