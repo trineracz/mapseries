@@ -72,6 +72,14 @@ public class HarvestService {
         task.setEndDate(LocalDateTime.now());
     }
 
+    /** Rollback: point the current version at an older snapshot. */
+    @Transactional
+    public void restoreVersion(long version) {
+        CurrentVersionDAO currentVersion = new CurrentVersionDAO();
+        currentVersion.setValue(version);
+        em.merge(currentVersion);
+    }
+
     /** Loads content-definition.json from the READ repo (public production data). */
     public String loadContentDefinition() {
         String url = String.format("https://raw.githubusercontent.com/%s/%s/master/content-definition.json",

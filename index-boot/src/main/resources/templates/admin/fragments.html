@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head th:fragment="adminHead">
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Mapseries</title>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/admin.css}"/>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/languages.min.css}"/>
+    <script type="text/javascript" th:src="@{/assets/main.js}"></script>
+</head>
+
+<body>
+
+<div th:fragment="leftPanel" class="sidenav">
+    <div class="sidenav-header">
+        <a th:href="@{/logout}"><span th:text="#{logout}"></span></a>
+    </div>
+    <ul class="nav flex-column">
+        <li th:classappend="${activeMenuItem == 'index'} ? 'active'"><a th:href="@{/admin/index.xhtml}"><i class="fas fa-table"></i> <span th:text="#{contentSettings}"></span></a></li>
+        <li th:classappend="${activeMenuItem == 'texts'} ? 'active'"><a th:href="@{/admin/texts.xhtml}"><i class="fas fa-font"></i> <span th:text="#{texts}"></span></a></li>
+        <li th:classappend="${activeMenuItem == 'update'} ? 'active'"><a th:href="@{/admin/update.xhtml}"><i class="fas fa-sync"></i> <span th:text="#{updateSettings}"></span></a></li>
+        <li th:classappend="${activeMenuItem == 'users'} ? 'active'"><a th:href="@{/admin/users.xhtml}"><i class="fas fa-users-cog"></i> <span th:text="#{usersSettings}"></span></a></li>
+        <li th:classappend="${activeMenuItem == 'non-linked-maps'} ? 'active'"><a th:href="@{/admin/non-linked-maps.xhtml}"><i class="fas fa-exclamation-circle"></i> <span th:text="#{non-linked-maps}"></span></a></li>
+    </ul>
+</div>
+
+<div th:fragment="topPanel" class="top-panel">
+    <a id="toggle-btn" href="#" class="menu-btn"><i class="fas fa-bars"></i></a>
+    <a th:href="@{/}" class="navbar-brand" th:text="#{applicationTitle}"></a>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{admin/fragments :: adminHead}"></head>
+<body>
+
+<th:block th:replace="~{fragments :: jsvars}"></th:block>
+
+<div th:if="${admin}" th:replace="~{admin/fragments :: leftPanel}"></div>
+
+<div class="page" th:classappend="${admin} ? '' : 'full'">
+
+    <div th:replace="~{admin/fragments :: topPanel}"></div>
+
+    <div class="main">
+
+        <table th:if="${!authenticated}" class="expand">
+            <tr class="text-center">
+                <td><a class="btn btn-success noexpand" th:href="${authUrl}" th:text="#{login}"></a></td>
+            </tr>
+        </table>
+
+        <table th:if="${authenticated and !admin}" class="expand">
+            <tr class="text-center">
+                <td><p class="text-danger noexpand" th:text="#{notAuthorized}"></p></td>
+            </tr>
+        </table>
+
+        <div th:if="${admin}">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="buttons">
+                        <button class="btn btn-danger" onclick="window.updateSettings.onUpdateDataClick()"
+                                th:text="#{updateSettings.updateDataAction}"></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-12">
+                    <table class="table">
+                        <tr>
+                            <th>ID</th>
+                            <th th:text="#{status}"></th>
+                            <th th:text="#{startDate}"></th>
+                            <th th:text="#{endDate}"></th>
+                            <th th:text="#{duration}"></th>
+                            <th th:text="#{rollback}"></th>
+                        </tr>
+                        <tr th:each="task : ${tasks}" th:classappend="${task.active} ? 'table-success' : ''">
+                            <td><a th:href="@{/admin/update-log.xhtml(task=${task.id})}" th:text="${task.id}"></a></td>
+                            <td th:text="#{__${task.status}__}"></td>
+                            <td th:text="${task.startDate}"></td>
+                            <td th:text="${task.endDate}"></td>
+                            <td th:text="${task.duration}"></td>
+                            <td>
+                                <button th:unless="${task.active}" type="button" class="btn btn-link"
+                                        th:onclick="'window.updateSettings.onRestoreVersionClick(' + ${task.id} + ')'">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <script>window.updateSettings.main();</script>
+        </div>
+
+    </div>
+</div>
+
+<script>window.admin.main()</script>
+
+</body>
+</html>
