@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+
+    <div class="container-fluid">
+        <div th:each="item : ${nonLinkedMaps}">
+            <h2 class="mt-4" th:utext="${item.key}"></h2>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item" th:each="sheet : ${item.value}">
+                    <div><strong>ID</strong>: <span th:text="${sheet.sheetId}"></span></div>
+                    <div><strong>Title</strong>: <span th:text="${sheet.title}"></span></div>
+                    <div><strong>Year</strong>: <span th:text="${sheet.year}"></span></div>
+                    <div><strong>DigitalLibraryUrl</strong>: <span th:text="${sheet.digitalLibraryUrl}"></span></div>
+                    <div><strong>VufindUrl</strong>: <span th:text="${sheet.vufindUrl}"></span></div>
+                    <div><strong>ThumbnailUrl</strong>: <span th:text="${sheet.thumbnailUrl}"></span></div>
+                    <div><strong>Author</strong>: <span th:text="${sheet.author}"></span></div>
+                    <div><strong>OtherAuthors</strong>: <span th:text="${sheet.otherAuthors}"></span></div>
+                    <div><strong>Publisher</strong>: <span th:text="${sheet.publisher}"></span></div>
+                    <div><strong>Issue</strong>: <span th:text="${sheet.issue}"></span></div>
+                    <div><strong>Description</strong>: <span th:text="${sheet.description}"></span></div>
+                    <div><strong>Signature</strong>: <span th:text="${sheet.signature}"></span></div>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

@@ -1,5 +1,6 @@
 package cz.mzk.mapseries.web;
 
+import cz.mzk.mapseries.admin.DataAnalyzer;
 import cz.mzk.mapseries.config.MapseriesProperties;
 import cz.mzk.mapseries.github.AuthService;
 import cz.mzk.mapseries.repository.AdminRepository;
@@ -31,15 +32,17 @@ public class AdminController {
     private final UpdateTaskRepository updateTaskRepository;
     private final CurrentVersionRepository currentVersionRepository;
     private final AdminRepository adminRepository;
+    private final DataAnalyzer dataAnalyzer;
     private final MapseriesProperties props;
 
     public AdminController(AuthService authService, UpdateTaskRepository updateTaskRepository,
                           CurrentVersionRepository currentVersionRepository, AdminRepository adminRepository,
-                          MapseriesProperties props) {
+                          DataAnalyzer dataAnalyzer, MapseriesProperties props) {
         this.authService = authService;
         this.updateTaskRepository = updateTaskRepository;
         this.currentVersionRepository = currentVersionRepository;
         this.adminRepository = adminRepository;
+        this.dataAnalyzer = dataAnalyzer;
         this.props = props;
     }
 
@@ -111,6 +114,25 @@ public class AdminController {
             model.addAttribute("currentLogin", authService.getLogin());
         }
         return "admin/users";
+    }
+
+    @GetMapping("/admin/non-linked-maps.xhtml")
+    public String nonLinkedMaps(@RequestParam(required = false) String code, Model model, HttpServletRequest request) {
+        if (code != null && !code.isBlank()) {
+            authService.authenticate(code);
+            return "redirect:/admin/non-linked-maps.xhtml";
+        }
+
+        boolean admin = authService.isAuthenticated() && authService.isAdmin();
+        model.addAttribute("authenticated", authService.isAuthenticated());
+        model.addAttribute("admin", admin);
+        model.addAttribute("activeMenuItem", "non-linked-maps");
+        model.addAttribute("authUrl", authUrl(request));
+
+        if (admin) {
+            model.addAttribute("nonLinkedMaps", dataAnalyzer.getNonLinkedMaps());
+        }
+        return "admin/non-linked-maps";
     }
 
     @GetMapping("/logout")
