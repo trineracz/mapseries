@@ -5,7 +5,7 @@
 
 <th:block th:replace="~{fragments :: jsvars}"></th:block>
 
-<div th:if="${admin}" th:replace="~{admin/fragments :: leftPanel}"></div>
+<nav th:replace="~{admin/fragments :: leftPanel}"></nav>
 
 <div class="page" th:classappend="${admin} ? '' : 'full'">
     <div th:replace="~{admin/fragments :: topPanel}"></div>
@@ -27,6 +27,8 @@
 </div>
 
 <script>window.admin.main()</script>
+
+<div class="loading"></div>
 
 </body>
 </html>

@@ -50,6 +50,12 @@ public class AdminController {
         this.props = props;
     }
 
+    /** Available to every admin view (the left panel shows the user's avatar + name). */
+    @org.springframework.web.bind.annotation.ModelAttribute("login")
+    public String currentLogin() {
+        return authService.getLogin() != null ? authService.getLogin() : "";
+    }
+
     @GetMapping("/admin")
     public String adminRoot() {
         return "redirect:/admin/index.xhtml";

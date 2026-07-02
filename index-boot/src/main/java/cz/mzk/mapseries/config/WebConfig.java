@@ -53,9 +53,11 @@ public class WebConfig implements WebMvcConfigurer {
     /** The static catalog/edit frontends live under /catalog and /edit; serve their index.html. */
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
-        registry.addViewController("/catalog").setViewName("forward:/catalog/index.html");
+        // Redirect to the trailing-slash URL so the pages' RELATIVE asset paths
+        // (e.g. main.css) resolve under /catalog/ and /edit/ instead of the root.
+        registry.addRedirectViewController("/catalog", "/catalog/");
         registry.addViewController("/catalog/").setViewName("forward:/catalog/index.html");
-        registry.addViewController("/edit").setViewName("forward:/edit/index.html");
+        registry.addRedirectViewController("/edit", "/edit/");
         registry.addViewController("/edit/").setViewName("forward:/edit/index.html");
     }
 }

@@ -13,23 +13,62 @@
 
 <body>
 
-<div th:fragment="leftPanel" class="sidenav">
-    <div class="sidenav-header">
-        <a th:href="@{/logout}"><span th:text="#{logout}"></span></a>
+<nav th:fragment="leftPanel" th:if="${admin}" class="side-navbar">
+    <div class="side-navbar-wrapper">
+        <div class="sidenav-header d-flex align-items-center justify-content-center">
+            <div class="sidenav-header-inner text-center">
+                <img th:src="'https://github.com/' + ${login} + '.png?size=150'" alt="person" class="img-fluid rounded-circle"/>
+                <h2 class="h5" th:text="${login}"></h2>
+                <a th:href="@{/logout}"><span th:text="#{logout}"></span></a>
+            </div>
+            <div class="sidenav-header-logo">
+                <a th:href="@{/logout}" class="brand-small text-center"><i class="fas fa-sign-out-alt"></i></a>
+            </div>
+        </div>
+        <ul id="side-main-menu" class="side-menu list-unstyled">
+            <li th:classappend="${activeMenuItem == 'index'} ? 'active'"><a th:href="@{/admin/index.xhtml}"><i class="fas fa-table"></i><span th:text="#{contentSettings}"></span></a></li>
+            <li th:classappend="${activeMenuItem == 'texts'} ? 'active'"><a th:href="@{/admin/texts.xhtml}"><i class="fas fa-font"></i><span th:text="#{texts}"></span></a></li>
+            <li th:classappend="${activeMenuItem == 'update'} ? 'active'"><a th:href="@{/admin/update.xhtml}"><i class="fas fa-sync"></i><span th:text="#{updateSettings}"></span></a></li>
+            <li th:classappend="${activeMenuItem == 'users'} ? 'active'"><a th:href="@{/admin/users.xhtml}"><i class="fas fa-users-cog"></i><span th:text="#{usersSettings}"></span></a></li>
+        </ul>
+        <h5 class="sidenav-heading" th:text="#{wrong-data-detection}"></h5>
+        <ul id="side-main-menu" class="side-menu list-unstyled">
+            <li th:classappend="${activeMenuItem == 'non-linked-maps'} ? 'active'"><a th:href="@{/admin/non-linked-maps.xhtml}"><i class="fas fa-exclamation-circle"></i><span th:text="#{non-linked-maps}"></span></a></li>
+        </ul>
     </div>
-    <ul class="nav flex-column">
-        <li th:classappend="${activeMenuItem == 'index'} ? 'active'"><a th:href="@{/admin/index.xhtml}"><i class="fas fa-table"></i> <span th:text="#{contentSettings}"></span></a></li>
-        <li th:classappend="${activeMenuItem == 'texts'} ? 'active'"><a th:href="@{/admin/texts.xhtml}"><i class="fas fa-font"></i> <span th:text="#{texts}"></span></a></li>
-        <li th:classappend="${activeMenuItem == 'update'} ? 'active'"><a th:href="@{/admin/update.xhtml}"><i class="fas fa-sync"></i> <span th:text="#{updateSettings}"></span></a></li>
-        <li th:classappend="${activeMenuItem == 'users'} ? 'active'"><a th:href="@{/admin/users.xhtml}"><i class="fas fa-users-cog"></i> <span th:text="#{usersSettings}"></span></a></li>
-        <li th:classappend="${activeMenuItem == 'non-linked-maps'} ? 'active'"><a th:href="@{/admin/non-linked-maps.xhtml}"><i class="fas fa-exclamation-circle"></i> <span th:text="#{non-linked-maps}"></span></a></li>
-    </ul>
-</div>
+</nav>
 
-<div th:fragment="topPanel" class="top-panel">
-    <a id="toggle-btn" href="#" class="menu-btn"><i class="fas fa-bars"></i></a>
-    <a th:href="@{/}" class="navbar-brand" th:text="#{applicationTitle}"></a>
-</div>
+<header th:fragment="topPanel" class="header">
+    <nav class="navbar">
+        <div class="container-fluid">
+            <div class="navbar-holder d-flex align-items-center justify-content-between">
+                <div class="navbar-header">
+                    <a th:if="${admin}" id="toggle-btn" href="#" class="menu-btn"><i class="fas fa-bars"></i></a>
+                    <a th:href="@{/}" class="navbar-brand">
+                        <div class="brand-text d-none d-md-inline-block"><strong>Mapseries</strong></div>
+                    </a>
+                </div>
+                <ul class="nav-menu list-unstyled d-flex flex-md-row align-items-md-center">
+                    <li class="nav-item dropdown">
+                        <a id="languages" rel="nofollow" data-target="#" href="#" data-toggle="dropdown"
+                           aria-haspopup="true" aria-expanded="false" class="nav-link language dropdown-toggle">
+                            <span class="lang-sm mr-2" th:attr="lang=${#locale.language}"></span>
+                            <span class="d-none d-sm-inline-block" th:text="#{__${#locale.language}__}"></span>
+                        </a>
+                        <ul aria-labelledby="languages" class="dropdown-menu">
+                            <li th:each="l : ${ {'cs','en'} }">
+                                <a rel="nofollow" th:href="'?lang=' + ${l}" class="dropdown-item">
+                                    <span class="lang-sm mr-2" th:attr="lang=${l}"></span>
+                                    <span th:text="#{__${l}__}"></span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
 
 </body>
 </html>
