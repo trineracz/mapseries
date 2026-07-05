@@ -2,6 +2,8 @@
 
 As name hints mapseries is a web application for presenting, editing and cataloging map's series. The application consists of three separate applications. Presentation application listening on root `/`, [cataloging application](catalog/README.md) listening on `/catalog` and application for editing and creating new series listening on `/edit`.
 
+> **📄 Modernizace stacku:** backend byl převeden z WildFly/JSF/Java EE na Spring Boot 3 / Java 17. Přehled změn, důvodů (technologie po konci podpory) a stavu projektu je v [**MIGRATION-REPORT.md**](MIGRATION-REPORT.md).
+
 ## How to deploy
 
 Recommended way for deploying the application is to use [Docker Compose](https://docs.docker.com/compose/). In the root's directory of the repository you can find file `docker-compose.yml` which can be used as a template for your deployment. Everything what must be done is just filling in few environment variables described below. If you are done, just run following command in the root's directory.
