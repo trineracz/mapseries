@@ -35,8 +35,11 @@ services:
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       MAPSERIES_HARVEST_LIMIT: ${MAPSERIES_HARVEST_LIMIT:-0}
+      # Data source (see .env for the read/write split explanation).
       MAPSERIES_REPO_USER: ${MAPSERIES_REPO_USER:-moravianlibrary}
+      MAPSERIES_REPO_NAME: ${MAPSERIES_REPO_NAME:-mapseries-data}
       MAPSERIES_REPO_WRITE_USER: ${MAPSERIES_REPO_WRITE_USER:-trineracz}
+      MAPSERIES_REPO_WRITE_NAME: ${MAPSERIES_REPO_WRITE_NAME:-mapseries-data}
     ports:
       - "8080:8080"   # the new app is now primary on :8080
 

@@ -2,6 +2,8 @@ package cz.mzk.mapseries.github;
 
 import cz.mzk.mapseries.config.MapseriesProperties;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -16,6 +18,8 @@ import java.nio.charset.StandardCharsets;
  */
 @Component
 public class GithubOAuth {
+
+    private static final Logger log = LoggerFactory.getLogger(GithubOAuth.class);
 
     private final MapseriesProperties props;
     private final RestClient http = RestClient.create();
@@ -45,13 +49,15 @@ public class GithubOAuth {
     }
 
     public String fetchLogin(String token) {
-        String body = http.get()
+        var response = http.get()
                 .uri("https://api.github.com/user")
                 .header("Authorization", "token " + token)
                 .header("Accept", "application/json")
                 .retrieve()
-                .body(String.class);
-        return new JSONObject(body).optString("login", "");
+                .toEntity(String.class);
+        // The granted scopes are echoed here; "repo" is required to commit to the data repo.
+        log.info("login: X-OAuth-Scopes='{}'", response.getHeaders().getFirst("X-OAuth-Scopes"));
+        return new JSONObject(response.getBody()).optString("login", "");
     }
 
     private static String enc(String value) {

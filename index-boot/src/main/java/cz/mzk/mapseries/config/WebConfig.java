@@ -59,5 +59,8 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addViewController("/catalog/").setViewName("forward:/catalog/index.html");
         registry.addRedirectViewController("/edit", "/edit/");
         registry.addViewController("/edit/").setViewName("forward:/edit/index.html");
+        // /admin (no slash) is handled by AdminController; /admin/ (trailing slash)
+        // was unmapped and fell through to the Whitelabel error page.
+        registry.addRedirectViewController("/admin/", "/admin/index.xhtml");
     }
 }

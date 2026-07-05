@@ -3,10 +3,13 @@ package cz.mzk.mapseries.github;
 import cz.mzk.mapseries.config.MapseriesProperties;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
  * Commits a single file to the WRITE repo (our fork) via the GitHub git-data
@@ -16,6 +19,8 @@ import org.springframework.web.client.RestClient;
 @Component
 public class GithubWriteService {
 
+    private static final Logger log = LoggerFactory.getLogger(GithubWriteService.class);
+
     private final MapseriesProperties props;
     private final RestClient http = RestClient.create();
 
@@ -24,29 +29,38 @@ public class GithubWriteService {
     }
 
     public void saveFile(String token, String commitMessage, String path, String content) {
-        String api = "https://api.github.com/repos/"
-                + props.repo().writeUser() + "/" + props.repo().writeName();
+        String repo = props.repo().writeUser() + "/" + props.repo().writeName();
+        String api = "https://api.github.com/repos/" + repo;
+        log.info("saveFile: committing '{}' to {} (token present={}, msg='{}')",
+                path, repo, token != null && !token.isBlank(), commitMessage);
+        try {
+            String masterSha = get(api + "/git/refs/heads/master", token)
+                    .getJSONObject("object").getString("sha");
 
-        String masterSha = get(api + "/git/refs/heads/master", token)
-                .getJSONObject("object").getString("sha");
+            String baseTreeSha = get(api + "/git/commits/" + masterSha, token)
+                    .getJSONObject("tree").getString("sha");
 
-        String baseTreeSha = get(api + "/git/commits/" + masterSha, token)
-                .getJSONObject("tree").getString("sha");
+            String blobSha = post(api + "/git/blobs", token,
+                    new JSONObject().put("content", content).put("encoding", "utf-8")).getString("sha");
 
-        String blobSha = post(api + "/git/blobs", token,
-                new JSONObject().put("content", content).put("encoding", "utf-8")).getString("sha");
+            JSONArray tree = new JSONArray().put(new JSONObject()
+                    .put("path", path).put("mode", "100644").put("type", "blob").put("sha", blobSha));
+            String newTreeSha = post(api + "/git/trees", token,
+                    new JSONObject().put("base_tree", baseTreeSha).put("tree", tree)).getString("sha");
 
-        JSONArray tree = new JSONArray().put(new JSONObject()
-                .put("path", path).put("mode", "100644").put("type", "blob").put("sha", blobSha));
-        String newTreeSha = post(api + "/git/trees", token,
-                new JSONObject().put("base_tree", baseTreeSha).put("tree", tree)).getString("sha");
+            String newCommitSha = post(api + "/git/commits", token, new JSONObject()
+                    .put("message", commitMessage)
+                    .put("tree", newTreeSha)
+                    .put("parents", new JSONArray().put(masterSha))).getString("sha");
 
-        String newCommitSha = post(api + "/git/commits", token, new JSONObject()
-                .put("message", commitMessage)
-                .put("tree", newTreeSha)
-                .put("parents", new JSONArray().put(masterSha))).getString("sha");
-
-        patch(api + "/git/refs/heads/master", token, new JSONObject().put("sha", newCommitSha));
+            patch(api + "/git/refs/heads/master", token, new JSONObject().put("sha", newCommitSha));
+            log.info("saveFile: committed {} to {}@master", newCommitSha, repo);
+        } catch (RestClientResponseException e) {
+            log.error("saveFile: GitHub API {} for {} -> {}", e.getStatusCode(), repo,
+                    e.getResponseBodyAsString());
+            throw new RuntimeException("GitHub API " + e.getStatusCode() + ": "
+                    + e.getResponseBodyAsString(), e);
+        }
     }
 
     private JSONObject get(String url, String token) {
