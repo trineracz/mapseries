@@ -9,6 +9,9 @@ import cz.mzk.mapseries.repository.CurrentVersionRepository;
 import cz.mzk.mapseries.repository.UpdateTaskRepository;
 import cz.mzk.mapseries.update.HarvestService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -125,6 +128,23 @@ public class AdminController {
             model.addAttribute("log", updateTask != null ? updateTask.getLog() : null);
         }
         return "admin/update-log";
+    }
+
+    /**
+     * Download a harvest task's log as a plain-text attachment (task-<id>.log).
+     * Faithful 1:1 port of the old AdminLogServlet (@WebServlet("/admin/log")):
+     * same path, same `taskId` param, same filename — for any external tool or
+     * bookmark that hits this URL directly. The old servlet had no auth gate;
+     * kept public to preserve parity (flip to an admin check if that's preferred).
+     */
+    @GetMapping("/admin/log")
+    public ResponseEntity<String> downloadLog(@RequestParam long taskId) {
+        var task = updateTaskRepository.findById(taskId).orElse(null);
+        String body = (task != null && task.getLog() != null) ? task.getLog() : "";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=task-" + taskId + ".log")
+                .contentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8))
+                .body(body);
     }
 
     @GetMapping("/admin/users.xhtml")
