@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{admin/fragments :: adminHead}"></head>
+<body>
+
+<th:block th:replace="~{fragments :: jsvars}"></th:block>
+
+<div th:if="${admin}" th:replace="~{admin/fragments :: leftPanel}"></div>
+
+<div class="page" th:classappend="${admin} ? '' : 'full'">
+
+    <div th:replace="~{admin/fragments :: topPanel}"></div>
+
+    <div class="main">
+
+        <table th:if="${!authenticated}" class="expand">
+            <tr class="text-center">
+                <td><a class="btn btn-success noexpand" th:href="${authUrl}" th:text="#{login}"></a></td>
+            </tr>
+        </table>
+
+        <table th:if="${authenticated and !admin}" class="expand">
+            <tr class="text-center">
+                <td><p class="text-danger noexpand" th:text="#{notAuthorized}"></p></td>
+            </tr>
+        </table>
+
+        <div th:if="${admin}">
+            <div class="row">
+                <div class="col-md-12">
+                    <div th:if="${saved}" class="alert alert-success">
+                        Série <strong th:text="${saved}"></strong> — uloženo (commit do datového repa).
+                    </div>
+                    <div th:if="${saveError}" class="alert alert-danger" th:text="${saveError}"></div>
+                    <div class="buttons">
+                        <a class="btn btn-success" th:href="@{/admin/series/new}">
+                            <i class="fas fa-plus"></i> Nová série
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-12">
+                    <table class="table">
+                        <tr>
+                            <th>Série</th>
+                            <th>Mřížka (grid)</th>
+                            <th></th>
+                        </tr>
+                        <tr th:each="s : ${series}">
+                            <td th:text="${s.prettyName}"></td>
+                            <td><code th:text="${s.grid}"></code></td>
+                            <td>
+                                <a class="btn btn-link" th:href="@{/admin/series/edit(name=${s.name})}">
+                                    <i class="fas fa-edit"></i> Upravit
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>window.admin.main()</script>
+
+</body>
+</html>

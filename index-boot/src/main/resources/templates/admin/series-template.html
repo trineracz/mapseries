@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Mapseries — katalogizační šablona</title>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/admin.css}"/>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/languages.min.css}"/>
+    <script type="text/javascript" th:src="@{/assets/main.js}"></script>
+    <style>
+        .tpl-layout { display: flex; gap: 16px; align-items: stretch; }
+        .tpl-col { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
+        .tpl-col h4 { margin: 0 0 6px; }
+        .tpl-editor { position: relative; height: 68vh; }
+        #tplBackdrop, #tplText {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; margin: 0;
+            font-family: monospace; font-size: 12px; line-height: 1.35; padding: 8px;
+            border: 1px solid #ccc; box-sizing: border-box; white-space: pre; overflow: auto; }
+        #tplBackdrop { z-index: 1; background: #fff; color: transparent; pointer-events: none; }
+        #tplBackdrop mark { background: #ffd0d0; color: transparent; }
+        #tplText { z-index: 2; background: transparent; color: #222; resize: none; }
+        #tplText.bad { border-color: #b23a2e; }
+        #synMsg.ok { color: #2e7d32; }
+        #synMsg.err { color: #b23a2e; }
+        .tpl-preview { height: 68vh; overflow-y: auto; border: 1px solid #ccc; padding: 8px; background: #fafafa; }
+        .tpl-preview table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .tpl-preview th, .tpl-preview td { border-bottom: 1px solid #e5e5e5; padding: 4px 6px; text-align: left; vertical-align: top; }
+        .tpl-preview th { color: #555; font-weight: 600; }
+        .tpl-tag { font-family: monospace; color: #0b5; font-weight: 700; }
+        .tpl-type { white-space: nowrap; }
+        .tpl-type.ro { color: #999; }
+        .tpl-detail { font-family: monospace; color: #b26a00; }
+        .tpl-opts { color: #333; }
+        .tpl-opts .more { color: #999; }
+        .badge-ro { background: #eee; color: #777; border-radius: 3px; font-size: 10px; padding: 1px 4px; margin-left: 4px; }
+        .hint { color: #888; font-size: 13px; }
+        #saveMsg { margin-left: 12px; }
+        .legend { font-size: 12px; color: #666; margin: 6px 0 10px; }
+        .legend b { color: #333; }
+    </style>
+</head>
+<body>
+
+<th:block th:replace="~{fragments :: jsvars}"></th:block>
+
+<div th:if="${admin}" th:replace="~{admin/fragments :: leftPanel}"></div>
+
+<div class="page" th:classappend="${admin} ? '' : 'full'">
+
+    <div th:replace="~{admin/fragments :: topPanel}"></div>
+
+    <div class="main">
+
+        <table th:if="${!authenticated}" class="expand">
+            <tr class="text-center">
+                <td><a class="btn btn-success noexpand" th:href="${authUrl}" th:text="#{login}"></a></td>
+            </tr>
+        </table>
+
+        <table th:if="${authenticated and !admin}" class="expand">
+            <tr class="text-center">
+                <td><p class="text-danger noexpand" th:text="#{notAuthorized}"></p></td>
+            </tr>
+        </table>
+
+        <div th:if="${admin}">
+            <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+            <div th:unless="${error}">
+                <div class="row">
+                    <div class="col-md-12">
+                        <a class="btn btn-link" th:href="@{/admin/series/edit(name=${seriesName})}">
+                            <i class="fas fa-arrow-left"></i> Zpět na definici série
+                        </a>
+                        <h3>Katalogizační šablona — <span th:text="${prettyName}"></span></h3>
+                        <p class="hint">
+                            Soubor <code th:text="${templatePath}">template/….txt</code> — MARC21 šablona, ze které
+                            katalog v <a th:href="@{/catalog/}" target="_blank">/catalog/</a> skládá záznam pro Aleph.
+                            Vlevo upravuješ text šablony, vpravo je živý náhled polí.
+                        </p>
+                        <div th:if="${templateMissing}" class="alert alert-warning">
+                            Šablona pro tuto sérii zatím neexistuje. Uložením vytvoříš nový soubor
+                            <code th:text="${templatePath}"></code>.
+                        </div>
+                        <div class="buttons">
+                            <button id="saveBtn" class="btn btn-success"><i class="fas fa-save"></i> Uložit šablonu</button>
+                            <span id="saveMsg"></span>
+                        </div>
+                        <div class="legend">
+                            Typy polí: <b>Rozbalovačka</b> = pevná nabídka hodnot ·
+                            <b>Z listu</b> = tažené z vlastnosti listu (geojson) ·
+                            <b>Dopočítané</b> = spočítá se z gridu ·
+                            <b>Podle pole</b> = odvozené od jiného pole.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="tpl-layout" id="editor" th:attr="data-grid=${grid},data-name=${seriesName}">
+                            <div class="tpl-col">
+                                <h4>Text šablony <span class="hint" id="synMsg"></span></h4>
+                                <div class="tpl-editor">
+                                    <pre id="tplBackdrop" aria-hidden="true"></pre>
+                                    <textarea id="tplText" spellcheck="false" th:text="${templateContent}"></textarea>
+                                </div>
+                            </div>
+                            <div class="tpl-col">
+                                <h4>Náhled polí <span class="hint" id="fieldCount"></span></h4>
+                                <div class="tpl-preview" id="preview"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>window.admin.main()</script>
+
+<script th:if="${admin and error == null}" th:inline="none">
+(function () {
+    var root = document.getElementById("editor");
+    if (!root) { return; }
+    var grid = root.getAttribute("data-grid");
+    var name = root.getAttribute("data-name");
+    var ta = document.getElementById("tplText");
+    var backdrop = document.getElementById("tplBackdrop");
+    var synMsg = document.getElementById("synMsg");
+    var preview = document.getElementById("preview");
+    var counter = document.getElementById("fieldCount");
+
+    function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+    }
+
+    // Mirror the catalogue's parser: the smallest brace span that JSON-parses is a field.
+    // Also report the first "{" that never parses = a syntax error to highlight.
+    function scan(text) {
+        var blocks = [], n = text.length, cursor = 0, bad = -1;
+        for (var i = 0; i < n; i++) {
+            if (i < cursor || text.charAt(i) !== "{") { continue; }
+            var ok = false;
+            for (var j = i + 1; j < n; j++) {
+                if (text.charAt(j) !== "}") { continue; }
+                try {
+                    var obj = JSON.parse(text.slice(i, j + 1));
+                    blocks.push({ obj: obj, start: i });
+                    cursor = j + 1; i = j; ok = true; break;
+                } catch (e) { /* not complete yet — widen to next } */ }
+            }
+            if (!ok && bad < 0) { bad = i; }
+        }
+        return { blocks: blocks, bad: bad };
+    }
+    function lineOf(text, idx) {
+        var line = 1;
+        for (var k = 0; k < idx; k++) { if (text.charAt(k) === "\n") { line++; } }
+        return line;
+    }
+    // Paint the offending block (from its "{" to the end of its line) red behind the textarea.
+    function paintError(text, bad) {
+        if (bad < 0) {
+            backdrop.textContent = "";
+            ta.classList.remove("bad");
+            synMsg.className = "hint ok";
+            synMsg.textContent = "✓ syntaxe v pořádku";
+            return;
+        }
+        var eol = text.indexOf("\n", bad);
+        if (eol < 0) { eol = text.length; }
+        backdrop.innerHTML = esc(text.slice(0, bad)) +
+            "<mark>" + esc(text.slice(bad, eol)) + "</mark>" + esc(text.slice(eol));
+        backdrop.scrollTop = ta.scrollTop; backdrop.scrollLeft = ta.scrollLeft;
+        ta.classList.add("bad");
+        synMsg.className = "hint err";
+        synMsg.textContent = "⚠ neplatný blok na řádku " + lineOf(text, bad);
+    }
+    ta.addEventListener("scroll", function () {
+        backdrop.scrollTop = ta.scrollTop; backdrop.scrollLeft = ta.scrollLeft;
+    });
+
+    // Record-start tags: a MARC tag (LDR/FMT/3 digits) at the very start of a line.
+    // JSON inner lines are indented, so they never match — no false tags.
+    function tagIndex(text) {
+        var re = /^(LDR|FMT|\d{3})/gm, m, out = [];
+        while ((m = re.exec(text)) !== null) { out.push({ pos: m.index, tag: m[1] }); }
+        return out;
+    }
+    function tagFor(tags, pos) {
+        var t = "";
+        for (var i = 0; i < tags.length; i++) { if (tags[i].pos <= pos) { t = tags[i].tag; } else { break; } }
+        return t;
+    }
+
+    function optText(v) {
+        if (v === null || v === undefined) { return ""; }
+        if (typeof v === "object") { return JSON.stringify(v); }
+        return String(v);
+    }
+    function renderOpts(arr) {
+        if (!arr || !arr.length) { return ""; }
+        var shown = arr.slice(0, 8).map(function (v) { return esc(optText(v)); });
+        var extra = arr.length > 8 ? ' <span class="more">… +' + (arr.length - 8) + "</span>" : "";
+        return shown.join(" · ") + extra;
+    }
+
+    function classify(o) {
+        var ro = o.enabled === false;
+        if (o.values !== undefined) { return { type: "Rozbalovačka", detail: "", opts: o.values, ro: ro }; }
+        if (o.valuesByBaseIndex !== undefined) { return { type: "Podle pole „" + (o.base || "") + "\"", detail: "", opts: o.valuesByBaseIndex, ro: ro }; }
+        if (o.value !== undefined) {
+            var v = o.value;
+            if (v && typeof v === "object") {
+                if (v.attr) { return { type: "Z listu", detail: v.attr, opts: null, ro: true }; }
+                if (v.formatFunction) { return { type: "Dopočítané", detail: v.formatFunction, opts: null, ro: true }; }
+            }
+            return { type: "Pevná hodnota", detail: optText(v), opts: null, ro: ro };
+        }
+        if (o.attr) { return { type: "Z listu", detail: o.attr, opts: null, ro: true }; }
+        if (o.base) { return { type: "Podle pole „" + o.base + "\"", detail: "", opts: null, ro: ro }; }
+        return { type: "Volný text", detail: o.id || "", opts: null, ro: ro };
+    }
+
+    function render() {
+        var text = ta.value;
+        var tags = tagIndex(text);
+        var res = scan(text);
+        var blocks = res.blocks;
+        paintError(text, res.bad);
+        var rows = "";
+        blocks.forEach(function (b) {
+            var c = classify(b.obj);
+            var tag = tagFor(tags, b.start) || "—";
+            rows += "<tr>" +
+                '<td class="tpl-tag">' + esc(tag) + "</td>" +
+                "<td>" + esc(b.obj.title || b.obj.id || "") + "</td>" +
+                '<td class="tpl-type' + (c.ro ? " ro" : "") + '">' + esc(c.type) +
+                    (c.ro ? '<span class="badge-ro">jen náhled</span>' : "") + "</td>" +
+                '<td class="tpl-detail">' + esc(c.detail || "") + "</td>" +
+                '<td class="tpl-opts">' + renderOpts(c.opts) + "</td>" +
+                "</tr>";
+        });
+        counter.textContent = "(" + blocks.length + " polí)";
+        if (!rows) {
+            preview.innerHTML = '<p class="hint">Žádná editovatelná pole (šablona neobsahuje bloky „{ … }\").</p>';
+            return;
+        }
+        preview.innerHTML = '<table><thead><tr>' +
+            "<th>MARC</th><th>Pole</th><th>Typ</th><th>Zdroj / hodnota</th><th>Nabídka</th>" +
+            "</tr></thead><tbody>" + rows + "</tbody></table>";
+    }
+
+    var timer = null;
+    ta.addEventListener("input", function () {
+        if (timer) { clearTimeout(timer); }
+        timer = setTimeout(render, 200);
+    });
+    render();
+
+    document.getElementById("saveBtn").addEventListener("click", function () {
+        var msg = document.getElementById("saveMsg");
+        msg.textContent = "Ukládám…"; msg.style.color = "";
+        fetch("/admin/series/template/save?name=" + encodeURIComponent(name) + "&grid=" + encodeURIComponent(grid), {
+            method: "POST", headers: { "Content-Type": "text/plain; charset=utf-8" }, body: ta.value
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            msg.textContent = res.success ? "✔ " + res.message : "✕ " + res.message;
+            msg.style.color = res.success ? "#2e7d32" : "#b23a2e";
+        })
+        .catch(function (e) { msg.textContent = "✕ " + e.message; msg.style.color = "#b23a2e"; });
+    });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{admin/fragments :: adminHead}"></head>
+<body>
+
+<th:block th:replace="~{fragments :: jsvars}"></th:block>
+
+<div th:if="${admin}" th:replace="~{admin/fragments :: leftPanel}"></div>
+
+<div class="page" th:classappend="${admin} ? '' : 'full'">
+
+    <div th:replace="~{admin/fragments :: topPanel}"></div>
+
+    <div class="main">
+
+        <table th:if="${!authenticated}" class="expand">
+            <tr class="text-center">
+                <td><a class="btn btn-success noexpand" th:href="${authUrl}" th:text="#{login}"></a></td>
+            </tr>
+        </table>
+
+        <table th:if="${authenticated and !admin}" class="expand">
+            <tr class="text-center">
+                <td><p class="text-danger noexpand" th:text="#{notAuthorized}"></p></td>
+            </tr>
+        </table>
+
+        <div th:if="${admin}">
+
+            <div class="row">
+                <div class="col-md-12">
+                    <h3 th:text="${mode == 'edit'} ? 'Upravit sérii' : 'Nová série'"></h3>
+                    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+                    <a class="btn btn-link" th:href="@{/admin/series}"><i class="fas fa-arrow-left"></i> Zpět na seznam</a>
+                    <a th:if="${mode == 'edit'}" class="btn btn-primary" th:href="@{/admin/series/sheets(name=${originalName})}">
+                        <i class="fas fa-map"></i> Editovat listy na mapě
+                    </a>
+                    <a th:if="${mode == 'edit'}" class="btn btn-info" th:href="@{/admin/series/template(name=${originalName})}">
+                        <i class="fas fa-list-alt"></i> Katalogizační šablona
+                    </a>
+                    <button th:if="${mode != 'edit'}" type="button" class="btn btn-info" disabled="disabled"
+                            title="Nejdřív ulož sérii — poté přidáš katalogizační šablonu.">
+                        <i class="fas fa-list-alt"></i> Katalogizační šablona (po uložení)
+                    </button>
+                    <form th:if="${mode == 'edit'}" method="post" th:action="@{/admin/series/delete}" style="display:inline"
+                          onsubmit="return confirm('Opravdu smazat tuto sérii z content-definition.json?');">
+                        <input type="hidden" name="name" th:value="${originalName}"/>
+                        <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> Smazat sérii</button>
+                    </form>
+                </div>
+            </div>
+
+            <form method="post" th:action="@{/admin/series/save}" enctype="multipart/form-data">
+                <input type="hidden" name="mode" th:value="${mode}"/>
+                <input type="hidden" name="originalName" th:value="${originalName}"/>
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="form-group">
+                            <label>Název série <small>(interní; obvykle obsahuje <code>[...]</code> pro hezký název)</small></label>
+                            <input type="text" class="form-control" name="name" th:value="${f_name}" required/>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Popis — česky</label>
+                            <textarea class="form-control" name="descCs" rows="4" th:text="${f_descCs}"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Popis — anglicky</label>
+                            <textarea class="form-control" name="descEn" rows="4" th:text="${f_descEn}"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>URL náhledu (thumbnail)</label>
+                            <input type="text" class="form-control" name="thumbnailUrl" th:value="${f_thumbnailUrl}" required/>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Mřížka (grid) <small>— název souboru bez přípony</small></label>
+                            <input type="text" class="form-control" name="grid" th:value="${f_grid}" required/>
+                        </div>
+                        <div class="form-group">
+                            <label>Párovací pole (field)</label>
+                            <input type="text" class="form-control" name="field" th:value="${f_field}" placeholder="490a" required/>
+                        </div>
+                        <div class="form-group">
+                            <label>Pole listů (sheets)</label>
+                            <input type="text" class="form-control" name="sheets" th:value="${f_sheets}" placeholder="490v" required/>
+                        </div>
+                        <div class="form-group">
+                            <label>Groupby</label>
+                            <input type="text" class="form-control" name="groupby" th:value="${f_groupby}" placeholder="field.substring(0,4)" required/>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label>
+                                Mřížka listů (geojson)
+                                <small th:if="${mode == 'new'}" class="text-danger">— nová série musí mít mřížku</small>
+                                <small th:if="${mode == 'edit'}">— nahraj jen pokud chceš mřížku nahradit</small>
+                            </label>
+                            <input type="file" class="form-control-file" name="gridFile" accept=".json,.geojson,application/json"/>
+                            <div th:if="${mode == 'new'}" class="mt-2">
+                                <label>
+                                    <input type="checkbox" name="drawGrid" value="true"/>
+                                    Nemám geojson — <strong>nakreslím mřížku na mapě</strong> (po uložení tě přepnu do editoru listů)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="buttons">
+                            <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Uložit</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="row" th:if="${sheetCount != null}">
+                <div class="col-md-12">
+                    <hr/>
+                    <h4>Listy v mřížce: <span th:text="${sheetCount}"></span>
+                        <small>(náhled prvních <span th:text="${#lists.size(sheetPreview)}"></span>)</small></h4>
+                    <table class="table">
+                        <tr><th>SHEET</th><th>TITLE</th><th>KOLONNE</th></tr>
+                        <tr th:each="sh : ${sheetPreview}">
+                            <td th:text="${sh.sheet}"></td>
+                            <td th:text="${sh.title}"></td>
+                            <td th:text="${sh.kolonne}"></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="row" th:if="${sheetError}">
+                <div class="col-md-12"><p class="text-danger" th:text="${sheetError}"></p></div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script>window.admin.main()</script>
+
+</body>
+</html>
