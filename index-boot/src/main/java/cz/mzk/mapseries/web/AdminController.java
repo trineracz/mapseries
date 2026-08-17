@@ -61,26 +61,17 @@ public class AdminController {
 
     @GetMapping("/admin")
     public String adminRoot() {
-        return "redirect:/admin/index.xhtml";
+        return "redirect:/admin/series";
     }
 
+    // Content settings merged into the new series editor (/admin/series); kept as a
+    // redirect so old bookmarks / OAuth callbacks still work.
     @GetMapping("/admin/index.xhtml")
-    public String index(@RequestParam(required = false) String code, Model model, HttpServletRequest request) {
+    public String index(@RequestParam(required = false) String code) {
         if (code != null && !code.isBlank()) {
             authService.authenticate(code);
-            return "redirect:/admin/index.xhtml";
         }
-
-        boolean admin = authService.isAuthenticated() && authService.isAdmin();
-        model.addAttribute("authenticated", authService.isAuthenticated());
-        model.addAttribute("admin", admin);
-        model.addAttribute("activeMenuItem", "index");
-        model.addAttribute("authUrl", authUrl(request));
-
-        if (admin) {
-            model.addAttribute("contentDefinitionData", harvestService.loadContentDefinition());
-        }
-        return "admin/index";
+        return "redirect:/admin/series";
     }
 
     @GetMapping("/admin/update.xhtml")
@@ -186,54 +177,13 @@ public class AdminController {
         return "admin/non-linked-maps";
     }
 
-    @GetMapping("/admin/texts.xhtml")
-    public String texts(@RequestParam(required = false) String code, Model model, HttpServletRequest request) {
+    // Description editing merged into the new series editor (/admin/series).
+    @GetMapping({"/admin/texts.xhtml", "/admin/text-editor.xhtml"})
+    public String texts(@RequestParam(required = false) String code) {
         if (code != null && !code.isBlank()) {
             authService.authenticate(code);
-            return "redirect:/admin/texts.xhtml";
         }
-        boolean admin = authService.isAuthenticated() && authService.isAdmin();
-        model.addAttribute("authenticated", authService.isAuthenticated());
-        model.addAttribute("admin", admin);
-        model.addAttribute("activeMenuItem", "texts");
-        model.addAttribute("authUrl", authUrl(request));
-
-        if (admin) {
-            model.addAttribute("definitions", loadDefinitions());
-            model.addAttribute("languages", List.of("cs", "en"));
-        }
-        return "admin/texts";
-    }
-
-    @GetMapping("/admin/text-editor.xhtml")
-    public String textEditor(@RequestParam(name = "text-lang", required = false, defaultValue = "cs") String textLang,
-                             @RequestParam(name = "text-name", required = false, defaultValue = "") String textName,
-                             @RequestParam(required = false) String code, Model model, HttpServletRequest request) {
-        if (code != null && !code.isBlank()) {
-            authService.authenticate(code);
-            return "redirect:/admin/text-editor.xhtml?text-lang=" + enc(textLang) + "&text-name=" + enc(textName);
-        }
-        boolean admin = authService.isAuthenticated() && authService.isAdmin();
-        model.addAttribute("authenticated", authService.isAuthenticated());
-        model.addAttribute("admin", admin);
-        model.addAttribute("activeMenuItem", "texts");
-        model.addAttribute("authUrl", authUrl(request));
-
-        if (admin) {
-            String json = harvestService.loadContentDefinition();
-            var item = ContentDefinitionManager.fromJsonString(json).getDefinitions().stream()
-                    .filter(d -> d.getName().equals(textName)).findFirst().orElse(null);
-            model.addAttribute("contentDefinitionData", json);
-            model.addAttribute("textLang", textLang);
-            model.addAttribute("textName", textName);
-            model.addAttribute("prettyName", item != null ? item.getPrettyName() : textName);
-            model.addAttribute("text", item != null ? item.getDescription(textLang).orElse("") : "");
-        }
-        return "admin/text-editor";
-    }
-
-    private List<cz.mzk.mapseries.managers.ContentDefinitionItem> loadDefinitions() {
-        return ContentDefinitionManager.fromJsonString(harvestService.loadContentDefinition()).getDefinitions();
+        return "redirect:/admin/series";
     }
 
     @GetMapping("/logout")
