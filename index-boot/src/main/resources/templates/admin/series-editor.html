@@ -38,10 +38,6 @@
                     <a th:if="${mode == 'edit'}" class="btn btn-info" th:href="@{/admin/series/template(name=${originalName})}">
                         <i class="fas fa-list-alt"></i> Katalogizační šablona
                     </a>
-                    <button th:if="${mode != 'edit'}" type="button" class="btn btn-info" disabled="disabled"
-                            title="Nejdřív ulož sérii — poté přidáš katalogizační šablonu.">
-                        <i class="fas fa-list-alt"></i> Katalogizační šablona (po uložení)
-                    </button>
                     <form th:if="${mode == 'edit'}" method="post" th:action="@{/admin/series/delete}" style="display:inline"
                           onsubmit="return confirm('Opravdu smazat tuto sérii z content-definition.json?');">
                         <input type="hidden" name="name" th:value="${originalName}"/>
@@ -109,6 +105,25 @@
                                 <label>
                                     <input type="checkbox" name="drawGrid" value="true"/>
                                     Nemám geojson — <strong>nakreslím mřížku na mapě</strong> (po uložení tě přepnu do editoru listů)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label>
+                                Katalogizační šablona (MARC21 <code>.txt</code>)
+                                <small th:if="${mode == 'new'}">— nepovinné, můžeš přeskočit</small>
+                                <small th:if="${mode == 'edit'}">— nahraj jen pokud chceš šablonu nahradit</small>
+                            </label>
+                            <input type="file" class="form-control-file" name="templateFile" accept=".txt,text/plain"/>
+                            <div th:if="${mode == 'new'}" class="mt-2">
+                                <label>
+                                    <input type="checkbox" name="createTemplate" value="true"/>
+                                    Nemám soubor — <strong>vytvořím šablonu v editoru</strong> (po uložení tě přepnu do editoru šablony)
                                 </label>
                             </div>
                         </div>

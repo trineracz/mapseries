@@ -125,6 +125,8 @@ public class SeriesEditorController {
                        @RequestParam(required = false, defaultValue = "") String descEn,
                        @RequestParam(value = "gridFile", required = false) MultipartFile gridFile,
                        @RequestParam(required = false, defaultValue = "false") boolean drawGrid,
+                       @RequestParam(value = "templateFile", required = false) MultipartFile templateFile,
+                       @RequestParam(required = false, defaultValue = "false") boolean createTemplate,
                        Model model, HttpServletRequest request, RedirectAttributes flash) {
 
         if (!gate(model, request)) {
@@ -151,6 +153,20 @@ public class SeriesEditorController {
                 err = "Nahraný soubor mřížky není platný JSON: " + e.getMessage();
             }
         }
+
+        String templateContent = null;
+        boolean hasTemplateUpload = templateFile != null && !templateFile.isEmpty();
+        if (err == null && hasTemplateUpload) {
+            try {
+                templateContent = new String(templateFile.getBytes(), StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                err = "Nahraný soubor šablony nejde přečíst: " + e.getMessage();
+            }
+            if (err == null) {
+                String terr = validateTemplate(templateContent);
+                if (terr != null) err = "Šablona: " + terr;
+            }
+        }
         if (err != null) {
             model.addAttribute("error", err);
             return "admin/series-editor";
@@ -172,6 +188,9 @@ public class SeriesEditorController {
         if (gridJson != null) {
             files.put("geojson/" + grid + ".json", gridJson);
         }
+        if (templateContent != null) {
+            files.put("template/" + grid + ".txt", templateContent);
+        }
 
         try {
             String msg = ("edit".equals(mode) ? "Edit series: " : "Create series: ") + prettyName(name);
@@ -182,12 +201,18 @@ public class SeriesEditorController {
         }
 
         // New series that opted to draw its grid → straight to the map to draw + save it.
+        // (Grid is foundational; a "create template" choice is then reachable from the
+        // definition toolbar afterwards.)
         if ("new".equals(mode) && drawGrid && !hasUpload) {
             return "redirect:/admin/series/sheets?name=" + enc(name);
         }
         flash.addFlashAttribute("saved", prettyName(name) + (dryRun() ? " (testovací režim)" : ""));
-        // A freshly created series lands on its own edit page, where the toolbar offers
-        // the sheet editor and the cataloguing template — so a template can be added right away.
+        // Opted to author the template now → open the template editor.
+        if ("new".equals(mode) && createTemplate && !hasTemplateUpload) {
+            return "redirect:/admin/series/template?name=" + enc(name);
+        }
+        // Otherwise a freshly created series lands on its own edit page, where the toolbar
+        // offers the sheet editor and the cataloguing template.
         if ("new".equals(mode)) {
             return "redirect:/admin/series/edit?name=" + enc(name);
         }
