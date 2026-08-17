@@ -28,11 +28,22 @@ public class GithubWriteService {
         this.props = props;
     }
 
+    /** Commit a single file (convenience wrapper around {@link #saveFiles}). */
     public void saveFile(String token, String commitMessage, String path, String content) {
+        saveFiles(token, commitMessage, java.util.Map.of(path, content));
+    }
+
+    /** Commit several files to the WRITE repo's master branch in ONE commit. */
+    public void saveFiles(String token, String commitMessage, java.util.Map<String, String> files) {
         String repo = props.repo().writeUser() + "/" + props.repo().writeName();
+        if (props.editor() != null && props.editor().dryRun()) {
+            log.warn("saveFiles: DRY-RUN — skipping commit of {} file(s) to {}: {}",
+                    files.size(), repo, files.keySet());
+            return;
+        }
         String api = "https://api.github.com/repos/" + repo;
-        log.info("saveFile: committing '{}' to {} (token present={}, msg='{}')",
-                path, repo, token != null && !token.isBlank(), commitMessage);
+        log.info("saveFiles: committing {} file(s) to {} (token present={}, msg='{}')",
+                files.size(), repo, token != null && !token.isBlank(), commitMessage);
         try {
             String masterSha = get(api + "/git/refs/heads/master", token)
                     .getJSONObject("object").getString("sha");
@@ -40,11 +51,13 @@ public class GithubWriteService {
             String baseTreeSha = get(api + "/git/commits/" + masterSha, token)
                     .getJSONObject("tree").getString("sha");
 
-            String blobSha = post(api + "/git/blobs", token,
-                    new JSONObject().put("content", content).put("encoding", "utf-8")).getString("sha");
-
-            JSONArray tree = new JSONArray().put(new JSONObject()
-                    .put("path", path).put("mode", "100644").put("type", "blob").put("sha", blobSha));
+            JSONArray tree = new JSONArray();
+            for (var entry : files.entrySet()) {
+                String blobSha = post(api + "/git/blobs", token,
+                        new JSONObject().put("content", entry.getValue()).put("encoding", "utf-8")).getString("sha");
+                tree.put(new JSONObject().put("path", entry.getKey()).put("mode", "100644")
+                        .put("type", "blob").put("sha", blobSha));
+            }
             String newTreeSha = post(api + "/git/trees", token,
                     new JSONObject().put("base_tree", baseTreeSha).put("tree", tree)).getString("sha");
 
@@ -54,9 +67,9 @@ public class GithubWriteService {
                     .put("parents", new JSONArray().put(masterSha))).getString("sha");
 
             patch(api + "/git/refs/heads/master", token, new JSONObject().put("sha", newCommitSha));
-            log.info("saveFile: committed {} to {}@master", newCommitSha, repo);
+            log.info("saveFiles: committed {} to {}@master", newCommitSha, repo);
         } catch (RestClientResponseException e) {
-            log.error("saveFile: GitHub API {} for {} -> {}", e.getStatusCode(), repo,
+            log.error("saveFiles: GitHub API {} for {} -> {}", e.getStatusCode(), repo,
                     e.getResponseBodyAsString());
             throw new RuntimeException("GitHub API " + e.getStatusCode() + ": "
                     + e.getResponseBodyAsString(), e);

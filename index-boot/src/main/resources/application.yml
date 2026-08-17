@@ -44,3 +44,7 @@ mapseries:
   github:
     client-id: ${GITHUB_CLIENT_ID:}
     client-secret: ${GITHUB_CLIENT_SECRET:}
+  editor:
+    # true = editor validates + logs writes but skips the GitHub commit
+    # (for local click-through when the OAuth app isn't approved on the write org).
+    dry-run: ${MAPSERIES_EDITOR_DRY_RUN:false}

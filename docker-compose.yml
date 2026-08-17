@@ -40,6 +40,8 @@ services:
       MAPSERIES_REPO_NAME: ${MAPSERIES_REPO_NAME:-mapseries-data}
       MAPSERIES_REPO_WRITE_USER: ${MAPSERIES_REPO_WRITE_USER:-trineracz}
       MAPSERIES_REPO_WRITE_NAME: ${MAPSERIES_REPO_WRITE_NAME:-mapseries-data}
+      # true = editor skips the actual GitHub commit (local click-through / demo).
+      MAPSERIES_EDITOR_DRY_RUN: ${MAPSERIES_EDITOR_DRY_RUN:-false}
     ports:
       - "8080:8080"   # the new app is now primary on :8080
 
