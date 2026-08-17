@@ -6,6 +6,8 @@ import cz.mzk.mapseries.github.GithubWriteService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -286,6 +288,21 @@ public class SeriesEditorController {
         }
     }
 
+    /** Admin loads the grid geojson from the WRITE repo (its own edits), fresh — the map
+     *  editor can't use /server/data (that proxies the READ repo and misses fork edits). */
+    @GetMapping(value = "/admin/series/sheets/data", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<String> sheetData(@RequestParam String grid) {
+        if (!(authService.isAuthenticated() && authService.isAdmin())) {
+            return ResponseEntity.status(403).build();
+        }
+        try {
+            return ResponseEntity.ok(readRaw("geojson/" + grid + ".json"));
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     /** Load the series' MARC21 cataloguing template (template/<grid>.txt) for editing. */
     @GetMapping("/admin/series/template")
     public String template(@RequestParam String name, @RequestParam(required = false) String code,
@@ -435,10 +452,20 @@ public class SeriesEditorController {
         return out;
     }
 
+    /** The admin edits the WRITE repo, so it must READ from there too — otherwise a series
+     *  it just created (which only exists in the write repo/fork) reads back as "not found".
+     *  Uses the authenticated contents API, not raw.githubusercontent.com, whose CDN caches
+     *  ~5 min and would hide a fresh commit. In production read == write, so this is a no-op. */
     private String readRaw(String path) {
-        String url = String.format("https://raw.githubusercontent.com/%s/%s/master/%s",
-                props.repo().readUser(), props.repo().readName(), path);
-        return http.get().uri(url).retrieve().body(String.class);
+        String repo = props.repo().writeUser() + "/" + props.repo().writeName();
+        String url = "https://api.github.com/repos/" + repo + "/contents/" + path + "?ref=master";
+        String token = authService.getToken();
+        return http.get().uri(url)
+                .headers(h -> {
+                    h.set("Accept", "application/vnd.github.raw");
+                    if (token != null && !token.isBlank()) { h.setBearerAuth(token); }
+                })
+                .retrieve().body(String.class);
     }
 
     private static JSONObject findByName(List<JSONObject> items, String name) {

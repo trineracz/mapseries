@@ -494,7 +494,7 @@
         });
     }
 
-    fetch("/server/data/geojson/" + encodeURIComponent(grid) + ".json")
+    fetch("/admin/series/sheets/data?grid=" + encodeURIComponent(grid))
         .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
         .then(function (data) { loadGeojson(data, true); })
         .catch(function () {
