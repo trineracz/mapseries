@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Mapseries — série</title>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/admin.css}"/>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/languages.min.css}"/>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/vendor/leaflet/leaflet.css}"/>
+    <script type="text/javascript" th:src="@{/assets/main.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/vendor/leaflet/leaflet.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/sheet-map-editor.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/template-editor.js}"></script>
+    <style>
+        .ws-card { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 14px; background: #fff; }
+        .ws-card > summary { cursor: pointer; font-weight: bold; font-size: 15px; padding: 12px 14px;
+            outline: none; list-style: none; }
+        .ws-card > summary::-webkit-details-marker { display: none; }
+        .ws-card > summary::before { content: "▸ "; color: #888; }
+        .ws-card[open] > summary::before { content: "▾ "; }
+        .ws-card > summary .sub { font-weight: normal; color: #888; font-size: 13px; margin-left: 6px; }
+        .ws-body { padding: 0 14px 14px; }
+        .ws-num { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center;
+            background: #3388ff; color: #fff; border-radius: 50%; font-size: 12px; margin-right: 6px; }
+        .ws-advanced { background: #f6f7f9; }
+        .ws-advanced .ws-body { color: #444; }
+        .help { color: #777; font-size: 12px; margin: 2px 0 8px; }
+        .help-i { display: inline-block; width: 15px; height: 15px; line-height: 15px; text-align: center;
+            border-radius: 50%; background: #bbb; color: #fff; font-size: 11px; font-style: normal; margin-right: 4px; }
+        .upload-row { margin: 6px 0 10px; }
+        .thumb-preview { max-height: 90px; border: 1px solid #ddd; margin-top: 6px; display: none; }
+
+        /* sheet map editor */
+        .sheets-layout { display: flex; gap: 16px; align-items: stretch; }
+        .sheets-map { flex: 1 1 auto; }
+        #map { height: 62vh; border: 1px solid #ccc; }
+        .sheets-side { flex: 0 0 360px; max-height: 62vh; overflow-y: auto; border: 1px solid #ccc; padding: 12px; }
+        .sheets-side .hint { color: #888; font-size: 13px; }
+        .prop-row { margin-bottom: 8px; }
+        .prop-row label { display: block; font-size: 12px; color: #555; margin-bottom: 2px; }
+        .prop-row input, .prop-row textarea { width: 100%; }
+        .sel { font-weight: bold; }
+        .tool { border: 1px solid #ddd; background: #fafafa; padding: 10px; margin-bottom: 12px; }
+        .tool input[type=number] { width: 64px; }
+        #pickStatus { font-size: 12px; color: #b23a2e; }
+        .leaflet-tooltip.sheet-label { background: transparent; border: none; box-shadow: none;
+            color: #1a1a1a; font-size: 10px; font-weight: 700; padding: 0; }
+        .leaflet-tooltip.sheet-label-md { font-size: 13px; }
+        .leaflet-tooltip.sheet-label-lg { font-size: 16px; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+        .ghost-plus { color: #2e7d32; font: 700 16px/20px sans-serif; text-align: center;
+            background: rgba(255,255,255,0.75); border: 1px solid #2e7d32; border-radius: 50%; }
+        .vhandle { background: #fff; border: 2px solid #b23a2e; border-radius: 2px; box-sizing: border-box; cursor: nwse-resize; }
+        .rothandle { background: #2e7d32; border: 2px solid #fff; border-radius: 50%; box-sizing: border-box; cursor: grab; }
+        .edgehandle { background: #fff; border: 2px solid #b23a2e; box-sizing: border-box; cursor: move; }
+        .movehandle { background: #3388ff; border: 2px solid #fff; border-radius: 50%; box-sizing: border-box; cursor: move; }
+
+        /* template editor */
+        .tpl-layout { display: flex; gap: 16px; align-items: stretch; }
+        .tpl-col { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
+        .tpl-col h5 { margin: 0 0 6px; }
+        .tpl-editor { position: relative; height: 58vh; }
+        #tplBackdrop, #tplText {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; margin: 0;
+            font-family: monospace; font-size: 12px; line-height: 1.35; padding: 8px;
+            border: 1px solid #ccc; box-sizing: border-box; white-space: pre; overflow: auto; }
+        #tplBackdrop { z-index: 1; background: #fff; color: transparent; pointer-events: none; }
+        #tplBackdrop mark { background: #ffd0d0; color: transparent; }
+        #tplText { z-index: 2; background: transparent; color: #222; resize: none; }
+        #tplText.bad { border-color: #b23a2e; }
+        #synMsg.ok { color: #2e7d32; }
+        #synMsg.err { color: #b23a2e; }
+        .tpl-preview { height: 58vh; overflow-y: auto; border: 1px solid #ccc; padding: 8px; background: #fafafa; }
+        .tpl-preview table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .tpl-preview th, .tpl-preview td { border-bottom: 1px solid #e5e5e5; padding: 4px 6px; text-align: left; vertical-align: top; }
+        .tpl-preview th { color: #555; font-weight: 600; }
+        .tpl-tag { font-family: monospace; color: #0b5; font-weight: 700; }
+        .tpl-type.ro { color: #999; }
+        .tpl-detail { font-family: monospace; color: #b26a00; }
+        .tpl-opts .more { color: #999; }
+        .badge-ro { background: #eee; color: #777; border-radius: 3px; font-size: 10px; padding: 1px 4px; margin-left: 4px; }
+        .hint { color: #888; font-size: 13px; }
+        .hint.ok { color: #2e7d32; }
+        .hint.err { color: #b23a2e; }
+
+        .gb-opt { display: block; margin: 4px 0; }
+        .gb-test { background: #eef3ff; border: 1px solid #cdd9f5; padding: 6px 8px; border-radius: 4px; margin-top: 6px; font-size: 13px; }
+        .gb-test code { background: #fff; padding: 1px 4px; border: 1px solid #ddd; }
+        #saveBar { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #ddd;
+            padding: 12px 0; margin-top: 8px; }
+        #saveMsg { margin-left: 12px; }
+    </style>
+</head>
+<body>
+
+<th:block th:replace="~{fragments :: jsvars}"></th:block>
+
+<div th:if="${admin}" th:replace="~{admin/fragments :: leftPanel}"></div>
+
+<div class="page" th:classappend="${admin} ? '' : 'full'">
+
+    <div th:replace="~{admin/fragments :: topPanel}"></div>
+
+    <div class="main">
+
+        <table th:if="${!authenticated}" class="expand">
+            <tr class="text-center">
+                <td><a class="btn btn-success noexpand" th:href="${authUrl}" th:text="#{login}"></a></td>
+            </tr>
+        </table>
+
+        <table th:if="${authenticated and !admin}" class="expand">
+            <tr class="text-center">
+                <td><p class="text-danger noexpand" th:text="#{notAuthorized}"></p></td>
+            </tr>
+        </table>
+
+        <div th:if="${admin}">
+            <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+            <div id="ws" th:unless="${error}" th:attr="data-mode=${mode},data-name=${originalName},data-grid=${f_grid},data-groupby=${f_groupby}">
+                <div class="row">
+                    <div class="col-md-12">
+                        <a class="btn btn-link" th:href="@{/admin/series}"><i class="fas fa-arrow-left"></i> Zpět na seznam</a>
+                        <h3 th:if="${mode == 'new'}">Nová série</h3>
+                        <h3 th:unless="${mode == 'new'}">Úprava série — <span th:text="${prettyName}"></span></h3>
+                        <form th:if="${mode != 'new'}" method="post" th:action="@{/admin/series/delete}" style="display:inline"
+                              onsubmit="return confirm('Opravdu smazat tuto sérii z content-definition.json?');">
+                            <input type="hidden" name="name" th:value="${originalName}"/>
+                            <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> Smazat sérii</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- ① ZÁKLAD -->
+                <details class="ws-card" open="open">
+                    <summary><span class="ws-num">1</span> Základní údaje</summary>
+                    <div class="ws-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label>Název série</label>
+                                    <div class="help"><i class="help-i">i</i>Přesný název tak, jak je v katalogovém záznamu (MARC 490 $a). Část v hranatých závorkách <code>[...]</code> se použije jako hezký název.</div>
+                                    <input type="text" class="form-control" name="name" th:value="${f_name}" required="required"/>
+                                </div>
+                                <div class="form-group">
+                                    <label>Popis — česky</label>
+                                    <textarea class="form-control" name="descCs" rows="3" th:text="${f_descCs}"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Popis — anglicky</label>
+                                    <textarea class="form-control" name="descEn" rows="3" th:text="${f_descEn}"></textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label>Náhledový obrázek (URL)</label>
+                                    <input type="text" class="form-control" name="thumbnailUrl" id="thumbUrl" th:value="${f_thumbnailUrl}"/>
+                                    <img id="thumbPreview" class="thumb-preview" alt="náhled"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- ② MŘÍŽKA LISTŮ -->
+                <details class="ws-card" id="gridSection">
+                    <summary><span class="ws-num">2</span> Mřížka listů <span class="sub" id="gridSub">— nakresli na mapě nebo nahraj geojson</span></summary>
+                    <div class="ws-body">
+                        <div class="upload-row">
+                            <label>Nahrát geojson (nepovinné): </label>
+                            <input type="file" id="gridUpload" accept=".json,.geojson,application/json"/>
+                            <span class="help" style="display:inline">— nahraný soubor se hned vykreslí na mapě a jde upravit</span>
+                        </div>
+                        <div class="sheets-layout">
+                            <div class="sheets-map"><div id="map"></div></div>
+                            <div class="sheets-side" id="side">
+                                <div class="tool">
+                                    <strong>Vytvořit</strong>
+                                    <div class="prop-row" style="margin-top:6px">
+                                        <button type="button" id="rectBtn" class="btn btn-sm btn-primary">Nový obdélník (2 rohy)</button>
+                                        <span id="pickStatus"></span>
+                                    </div>
+                                    <hr style="margin:8px 0"/>
+                                    <div class="hint">…nebo pravidelná mřížka:</div>
+                                    <div class="prop-row">
+                                        <button type="button" id="pickBtn" class="btn btn-sm btn-default">Vybrat oblast (2 rohy)</button>
+                                        <label>Ř</label><input type="number" id="rows" min="1" value="4"/>
+                                        <label>S</label><input type="number" id="cols" min="1" value="4"/>
+                                        <button type="button" id="genBtn" class="btn btn-sm btn-warning" disabled="disabled">Generovat</button>
+                                    </div>
+                                    <div class="prop-row">
+                                        <button type="button" id="undoBtn" class="btn btn-sm btn-default"><i class="fas fa-undo"></i> Zpět</button>
+                                    </div>
+                                </div>
+                                <div id="props"><p class="hint">Načítám mřížku…</p></div>
+                            </div>
+                        </div>
+                        <p class="hint" style="margin-top:8px">
+                            Klik na list = úprava (rohy táhni pro velikost, zelený úchyt nahoře pro <strong>rotaci</strong>;
+                            Shift/Ctrl = rotace po 15°). Najetí myší nabídne prázdné sousedy „+". Ctrl/Cmd+Z = zpět.
+                        </p>
+                    </div>
+                </details>
+
+                <!-- ③ KATALOGIZAČNÍ ŠABLONA -->
+                <details class="ws-card" id="tplSection">
+                    <summary><span class="ws-num">3</span> Katalogizační šablona <span class="sub">— nepovinné, můžeš přeskočit</span></summary>
+                    <div class="ws-body">
+                        <div class="help"><i class="help-i">i</i>MARC21 šablona, ze které katalog skládá záznam pro Aleph. Vlevo text, vpravo živý náhled polí.</div>
+                        <div class="upload-row">
+                            <label>Nahrát šablonu (.txt): </label>
+                            <input type="file" id="tplUpload" accept=".txt,text/plain"/>
+                            <span class="help" style="display:inline">— nahraný soubor se hned zobrazí a jde upravit</span>
+                        </div>
+                        <div class="tpl-layout">
+                            <div class="tpl-col">
+                                <h5>Text šablony <span class="hint" id="synMsg"></span></h5>
+                                <div class="tpl-editor">
+                                    <pre id="tplBackdrop" aria-hidden="true"></pre>
+                                    <textarea id="tplText" spellcheck="false"></textarea>
+                                </div>
+                            </div>
+                            <div class="tpl-col">
+                                <h5>Náhled polí <span class="hint" id="fieldCount"></span></h5>
+                                <div class="tpl-preview" id="preview"></div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- ④ NAPOJENÍ NA KATALOG (technické) -->
+                <details class="ws-card ws-advanced" open="open">
+                    <summary><span class="ws-num">4</span> Napojení na katalog <span class="sub">(technické — předvyplněno)</span></summary>
+                    <div class="ws-body">
+                        <div class="help"><i class="help-i">i</i>Tady se nastavuje, jak katalog pozná, že mapa patří do této série a který je to list. Skoro vždy nech tak, jak je předvyplněno.</div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Název série je v MARC poli</label>
+                                    <div class="help">Kde katalog hledá název série. Skoro vždy <code>490a</code>.</div>
+                                    <input type="text" class="form-control" name="field" th:value="${f_field}"/>
+                                </div>
+                                <div class="form-group">
+                                    <label>Číslo listu je v MARC poli</label>
+                                    <div class="help">Kde katalog hledá číslo/svazek listu. Skoro vždy <code>490v</code>.</div>
+                                    <input type="text" class="form-control" name="sheets" th:value="${f_sheets}"/>
+                                </div>
+                                <div class="form-group">
+                                    <label>Soubor mapy (grid)</label>
+                                    <div class="help">Název souboru s mřížkou. Navrhne se podle názvu série; přepiš jen když chceš sdílet mřížku s jinou sérií.</div>
+                                    <input type="text" class="form-control" name="grid" th:value="${f_grid}" required="required"/>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Jak z čísla listu udělat ID listu</label>
+                                    <div class="help">Číslo listu v záznamu bývá „ušpiněné" (např. <code>1, 1885</code>). Tímhle z něj vyřízneš čisté ID, které sedí na mřížku.</div>
+                                    <label class="gb-opt"><input type="radio" name="gbMode" value="prefix"/> Prvních
+                                        <input type="number" id="gbN" min="1" value="4" style="width:56px"/> znaků</label>
+                                    <label class="gb-opt"><input type="radio" name="gbMode" value="toComma"/> Text do první čárky</label>
+                                    <label class="gb-opt"><input type="radio" name="gbMode" value="custom"/> Vlastní výraz
+                                        <input type="text" id="gbCustom" class="form-control" style="margin-top:4px" placeholder="field.substring(0,4)"/></label>
+                                    <div class="gb-test">
+                                        Test: <input type="text" id="gbTestIn" value="1, 1885" style="width:120px"/>
+                                        → <code id="gbTestOut">?</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <div id="saveBar">
+                    <button type="button" id="saveBtn" class="btn btn-success btn-lg"><i class="fas fa-save"></i> Uložit sérii</button>
+                    <span id="saveMsg"></span>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>window.admin.main()</script>
+
+<script th:if="${admin and error == null}" th:inline="none">
+(function () {
+    var ws = document.getElementById("ws");
+    if (!ws) { return; }
+    var mode = ws.getAttribute("data-mode");
+    var originalName = ws.getAttribute("data-name") || "";
+    var initialGrid = ws.getAttribute("data-grid") || "";
+
+    var $ = function (sel) { return document.querySelector(sel); };
+    var mapApi = null, tplApi = null;
+
+    // ---------- ① thumbnail live preview ----------
+    var thumbUrl = document.getElementById("thumbUrl");
+    var thumbImg = document.getElementById("thumbPreview");
+    function refreshThumb() {
+        var u = (thumbUrl.value || "").trim();
+        if (u) { thumbImg.src = u; thumbImg.style.display = "block"; } else { thumbImg.style.display = "none"; }
+    }
+    thumbUrl.addEventListener("input", refreshThumb);
+    thumbImg.addEventListener("error", function () { thumbImg.style.display = "none"; });
+    refreshThumb();
+
+    // ---------- ② grid: lazy-init map on first open ----------
+    var gridSection = document.getElementById("gridSection");
+    var gridSub = document.getElementById("gridSub");
+    function initMap(cb) {
+        if (mapApi) { mapApi.invalidateSize(); if (cb) { cb(); } return; }
+        var done = function (gj) { mapApi = SheetMapEditor.init({ initialGeojson: gj }); mapApi.invalidateSize(); if (cb) { cb(); } };
+        if (mode !== "new" && initialGrid) {
+            fetch("/admin/series/sheets/data?grid=" + encodeURIComponent(initialGrid))
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (gj) { done(gj); })
+                .catch(function () { done(null); });
+        } else { done(null); }
+    }
+    gridSection.addEventListener("toggle", function () { if (gridSection.open) { initMap(); } });
+    document.getElementById("gridUpload").addEventListener("change", function (e) {
+        var file = e.target.files[0]; if (!file) { return; }
+        var reader = new FileReader();
+        reader.onload = function () {
+            var gj;
+            try { gj = JSON.parse(reader.result); } catch (err) { alert("Neplatný geojson: " + err.message); return; }
+            if (!gridSection.open) { gridSection.open = true; }
+            initMap(function () { mapApi.setGeojson(gj); });
+        };
+        reader.readAsText(file);
+    });
+
+    // ---------- ③ template: lazy-init on first open ----------
+    var tplSection = document.getElementById("tplSection");
+    function initTpl(cb) {
+        if (tplApi) { if (cb) { cb(); } return; }
+        var done = function (txt) { tplApi = TemplateEditor.init({ initialText: txt || "" }); if (cb) { cb(); } };
+        if (mode !== "new" && initialGrid) {
+            fetch("/admin/series/template/data?grid=" + encodeURIComponent(initialGrid))
+                .then(function (r) { return r.ok ? r.text() : ""; })
+                .then(function (txt) { done(txt); })
+                .catch(function () { done(""); });
+        } else { done(""); }
+    }
+    tplSection.addEventListener("toggle", function () { if (tplSection.open) { initTpl(); } });
+    document.getElementById("tplUpload").addEventListener("change", function (e) {
+        var file = e.target.files[0]; if (!file) { return; }
+        var reader = new FileReader();
+        reader.onload = function () {
+            if (!tplSection.open) { tplSection.open = true; }
+            initTpl(function () { tplApi.setText(reader.result); });
+        };
+        reader.readAsText(file);
+    });
+
+    // ---------- ④ advanced: grid auto-slug + groupby ----------
+    var nameInput = $("[name=name]"), gridInput = $("[name=grid]");
+    function slugify(s) {
+        return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+            .replace(/[\[\];:]/g, " ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    }
+    if (mode === "new") {
+        nameInput.addEventListener("input", function () { if (!gridInput.getAttribute("data-touched")) { gridInput.value = slugify(nameInput.value); } });
+        gridInput.addEventListener("input", function () { gridInput.setAttribute("data-touched", "1"); });
+        if (!gridInput.value) { gridInput.value = slugify(nameInput.value); }
+    }
+
+    var gbN = document.getElementById("gbN"), gbCustom = document.getElementById("gbCustom");
+    var gbTestIn = document.getElementById("gbTestIn"), gbTestOut = document.getElementById("gbTestOut");
+    function gbMode() { var r = $("[name=gbMode]:checked"); return r ? r.value : "prefix"; }
+    function currentGroupby() {
+        var m = gbMode();
+        if (m === "prefix") { return "field.substring(0," + (parseInt(gbN.value, 10) || 4) + ")"; }
+        if (m === "toComma") { return "field.substring(0, field.indexOf(','))"; }
+        return (gbCustom.value || "").trim();
+    }
+    function runGbTest() {
+        var expr = currentGroupby(), field = gbTestIn.value, out;
+        try { out = (new Function("field", "return (" + expr + ")"))(field); }
+        catch (e) { out = "⚠ " + e.message; }
+        gbTestOut.textContent = out === undefined ? "(prázdné)" : String(out);
+    }
+    ["change", "input"].forEach(function (ev) {
+        document.querySelectorAll("[name=gbMode]").forEach(function (r) { r.addEventListener(ev, runGbTest); });
+        gbN.addEventListener(ev, runGbTest); gbCustom.addEventListener(ev, runGbTest); gbTestIn.addEventListener(ev, runGbTest);
+    });
+    // preselect groupby from server value
+    (function () {
+        var gb = ws.getAttribute("data-groupby") || "field.substring(0,4)";
+        var mp = gb.match(/^field\.substring\(0,\s*(\d+)\)$/);
+        if (mp) { $("[name=gbMode][value=prefix]").checked = true; gbN.value = mp[1]; }
+        else if (gb.replace(/\s/g, "") === "field.substring(0,field.indexOf(','))") { $("[name=gbMode][value=toComma]").checked = true; }
+        else { $("[name=gbMode][value=custom]").checked = true; gbCustom.value = gb; }
+        runGbTest();
+    })();
+
+    // ---------- save (one atomic commit) ----------
+    var msg = document.getElementById("saveMsg");
+    function fail(m) { msg.textContent = "✕ " + m; msg.style.color = "#b23a2e"; }
+    document.getElementById("saveBtn").addEventListener("click", function () {
+        var payload = {
+            mode: mode,
+            originalName: originalName,
+            name: (nameInput.value || "").trim(),
+            descCs: $("[name=descCs]").value,
+            descEn: $("[name=descEn]").value,
+            thumbnailUrl: ($("[name=thumbnailUrl]").value || "").trim(),
+            field: ($("[name=field]").value || "").trim(),
+            sheets: ($("[name=sheets]").value || "").trim(),
+            groupby: currentGroupby(),
+            grid: (gridInput.value || "").trim(),
+            geojson: mapApi ? JSON.stringify(mapApi.getGeojson(), function (k, v) { return k === "_template" ? undefined : v; }, 2) : null,
+            template: tplApi ? tplApi.getText() : null
+        };
+        if (!payload.name) { return fail("Vyplň název série."); }
+        if (!payload.grid) { return fail("Vyplň „Soubor mapy (grid)\" v sekci Napojení."); }
+        if (!payload.field || !payload.sheets || !payload.groupby) { return fail("Vyplň pole v sekci Napojení na katalog."); }
+        if (mode === "new" && (!mapApi || !mapApi.hasFeatures())) { return fail("Nakresli nebo nahraj alespoň jeden list mřížky (sekce 2)."); }
+        if (tplApi && !tplApi.isValid()) { return fail("Šablona má neplatný JSON blok — oprav ho (sekce 3)."); }
+
+        msg.textContent = "Ukládám…"; msg.style.color = "";
+        fetch("/admin/series/save", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (res.success) {
+                msg.textContent = "✔ " + res.message; msg.style.color = "#2e7d32";
+                if (res.redirect) { setTimeout(function () { location.href = res.redirect; }, 700); }
+            } else { fail(res.message); }
+        })
+        .catch(function (e) { fail(e.message); });
+    });
+})();
+</script>
+
+</body>
+</html>

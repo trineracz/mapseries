@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.net.URLEncoder;
@@ -37,7 +36,6 @@ import java.util.Map;
 public class SeriesEditorController {
 
     private static final String CONTENT_DEFINITION_PATH = "content-definition.json";
-    private static final int SHEET_PREVIEW_LIMIT = 60;
 
     private final AuthService authService;
     private final GithubWriteService githubWriteService;
@@ -68,39 +66,48 @@ public class SeriesEditorController {
         return "admin/series-list";
     }
 
+    /** New-series workspace: one page for the whole series (basics + grid + template + wiring). */
     @GetMapping("/admin/series/new")
-    public String newForm(@RequestParam(required = false) String code, Model model, HttpServletRequest request) {
+    public String newSeries(@RequestParam(required = false) String code, Model model, HttpServletRequest request) {
         if (code != null && !code.isBlank()) {
             authService.authenticate(code);
             return "redirect:/admin/series/new";
         }
         if (!gate(model, request)) {
-            return "admin/series-editor";
+            return "admin/series-workspace";
         }
         model.addAttribute("mode", "new");
         model.addAttribute("originalName", "");
-        return "admin/series-editor";
+        model.addAttribute("f_name", "");
+        model.addAttribute("f_grid", "");
+        model.addAttribute("f_sheets", "490v");     // sensible defaults — 100% of series use these
+        model.addAttribute("f_field", "490a");
+        model.addAttribute("f_groupby", "field.substring(0,4)");
+        model.addAttribute("f_thumbnailUrl", "");
+        model.addAttribute("f_descCs", "");
+        model.addAttribute("f_descEn", "");
+        return "admin/series-workspace";
     }
 
+    /** Edit-series workspace (same page as new; prefilled; grid/template loaded via AJAX). */
     @GetMapping("/admin/series/edit")
-    public String editForm(@RequestParam String name, @RequestParam(required = false) String code,
-                           Model model, HttpServletRequest request) {
+    public String editSeries(@RequestParam String name, @RequestParam(required = false) String code,
+                             Model model, HttpServletRequest request) {
         if (code != null && !code.isBlank()) {
             authService.authenticate(code);
             return "redirect:/admin/series/edit?name=" + enc(name);
         }
         if (!gate(model, request)) {
-            return "admin/series-editor";
+            return "admin/series-workspace";
         }
         JSONObject item = findByName(readContentDefinition(), name);
         if (item == null) {
             model.addAttribute("error", "Série \"" + name + "\" nebyla nalezena.");
-            model.addAttribute("mode", "new");
-            model.addAttribute("originalName", "");
-            return "admin/series-editor";
+            return "admin/series-workspace";
         }
         model.addAttribute("mode", "edit");
         model.addAttribute("originalName", name);
+        model.addAttribute("prettyName", prettyName(item.getString("name")));
         model.addAttribute("f_name", item.getString("name"));
         model.addAttribute("f_grid", item.optString("grid", ""));
         model.addAttribute("f_sheets", item.optString("sheets", ""));
@@ -110,115 +117,65 @@ public class SeriesEditorController {
         JSONObject desc = item.optJSONObject("description");
         model.addAttribute("f_descCs", desc != null ? desc.optString("cs", "") : "");
         model.addAttribute("f_descEn", desc != null ? desc.optString("en", "") : "");
-        addSheetPreview(model, item.optString("grid", ""));
-        return "admin/series-editor";
+        return "admin/series-workspace";
     }
 
+    /** Atomic save from the workspace: definition + (optional) geojson + (optional) template,
+     *  all committed in ONE commit. Called via JSON from series-workspace.html. */
     @PostMapping("/admin/series/save")
-    public String save(@RequestParam String mode,
-                       @RequestParam String originalName,
-                       @RequestParam String name,
-                       @RequestParam String grid,
-                       @RequestParam String sheets,
-                       @RequestParam String field,
-                       @RequestParam String groupby,
-                       @RequestParam String thumbnailUrl,
-                       @RequestParam(required = false, defaultValue = "") String descCs,
-                       @RequestParam(required = false, defaultValue = "") String descEn,
-                       @RequestParam(value = "gridFile", required = false) MultipartFile gridFile,
-                       @RequestParam(required = false, defaultValue = "false") boolean drawGrid,
-                       @RequestParam(value = "templateFile", required = false) MultipartFile templateFile,
-                       @RequestParam(required = false, defaultValue = "false") boolean createTemplate,
-                       Model model, HttpServletRequest request, RedirectAttributes flash) {
-
-        if (!gate(model, request)) {
-            return "admin/series-editor";
+    @ResponseBody
+    public Map<String, Object> save(@RequestBody SaveRequest req) {
+        if (!(authService.isAuthenticated() && authService.isAdmin())) {
+            return Map.of("success", false, "message", "Nejste přihlášen jako správce.");
         }
+        String mode = req.mode() == null ? "new" : req.mode();
+        String name = trim(req.name()), grid = trim(req.grid());
+        String field = trim(req.field()), sheets = trim(req.sheets()), groupby = trim(req.groupby());
+        String thumb = trim(req.thumbnailUrl());
+        String descCs = req.descCs() == null ? "" : req.descCs();
+        String descEn = req.descEn() == null ? "" : req.descEn();
 
-        // Re-populate the form so validation errors don't wipe the user's input.
-        fillForm(model, mode, originalName, name, grid, sheets, field, groupby, thumbnailUrl, descCs, descEn);
-
-        String err = validate(name, grid, sheets, field, groupby, thumbnailUrl);
-        boolean hasUpload = gridFile != null && !gridFile.isEmpty();
-        // A new series always needs a grid — either uploaded now, or drawn on the
-        // map right after (drawGrid), which is committed on the sheets page.
-        if (err == null && "new".equals(mode) && !hasUpload && !drawGrid) {
-            err = "Nová série musí mít mřížku — nahraj geojson, nebo zaškrtni nakreslení na mapě.";
+        String err = validate(name, grid, sheets, field, groupby, thumb);
+        if (err == null && req.geojson() != null) {
+            try { new JSONObject(req.geojson()); } catch (Exception e) { err = "Neplatný geojson: " + e.getMessage(); }
         }
-
-        String gridJson = null;
-        if (err == null && hasUpload) {
-            try {
-                gridJson = new String(gridFile.getBytes(), StandardCharsets.UTF_8);
-                new JSONObject(gridJson); // validate it parses as JSON
-            } catch (Exception e) {
-                err = "Nahraný soubor mřížky není platný JSON: " + e.getMessage();
-            }
+        boolean hasTemplate = req.template() != null && !req.template().isBlank();
+        if (err == null && hasTemplate) {
+            String terr = validateTemplate(req.template());
+            if (terr != null) err = "Šablona: " + terr;
         }
-
-        String templateContent = null;
-        boolean hasTemplateUpload = templateFile != null && !templateFile.isEmpty();
-        if (err == null && hasTemplateUpload) {
-            try {
-                templateContent = new String(templateFile.getBytes(), StandardCharsets.UTF_8);
-            } catch (Exception e) {
-                err = "Nahraný soubor šablony nejde přečíst: " + e.getMessage();
-            }
-            if (err == null) {
-                String terr = validateTemplate(templateContent);
-                if (terr != null) err = "Šablona: " + terr;
-            }
+        if (err == null && "new".equals(mode) && req.geojson() == null) {
+            err = "Nová série musí mít mřížku listů.";
         }
         if (err != null) {
-            model.addAttribute("error", err);
-            return "admin/series-editor";
+            return Map.of("success", false, "message", err);
         }
 
-        // Build/replace the entry and re-serialize the whole content-definition.
         List<JSONObject> items = readContentDefinition();
-        JSONObject entry = buildEntry(name, grid, sheets, field, groupby, thumbnailUrl, descCs, descEn);
-        String locate = "edit".equals(mode) && !originalName.isBlank() ? originalName : name;
+        JSONObject entry = buildEntry(name, grid, sheets, field, groupby, thumb, descCs, descEn);
+        String locate = "edit".equals(mode) && req.originalName() != null && !req.originalName().isBlank()
+                ? req.originalName() : name;
         int idx = indexOfName(items, locate);
-        if (idx >= 0) {
-            items.set(idx, entry);
-        } else {
-            items.add(entry);
-        }
+        if (idx >= 0) { items.set(idx, entry); } else { items.add(entry); }
 
         Map<String, String> files = new LinkedHashMap<>();
         files.put(CONTENT_DEFINITION_PATH, serialize(items));
-        if (gridJson != null) {
-            files.put("geojson/" + grid + ".json", gridJson);
-        }
-        if (templateContent != null) {
-            files.put("template/" + grid + ".txt", templateContent);
-        }
+        if (req.geojson() != null) { files.put("geojson/" + grid + ".json", req.geojson()); }
+        if (hasTemplate) { files.put("template/" + grid + ".txt", req.template()); }
 
         try {
             String msg = ("edit".equals(mode) ? "Edit series: " : "Create series: ") + prettyName(name);
             githubWriteService.saveFiles(authService.getToken(), msg, files);
         } catch (Exception e) {
-            model.addAttribute("error", "Uložení na GitHub selhalo: " + e.getMessage());
-            return "admin/series-editor";
+            return Map.of("success", false, "message", "Uložení na GitHub selhalo: " + e.getMessage());
         }
+        return Map.of("success", true, "redirect", "/admin/series",
+                "message", dryRun() ? "Uloženo (testovací režim — necommitnuto)." : "Uloženo.");
+    }
 
-        // New series that opted to draw its grid → straight to the map to draw + save it.
-        // (Grid is foundational; a "create template" choice is then reachable from the
-        // definition toolbar afterwards.)
-        if ("new".equals(mode) && drawGrid && !hasUpload) {
-            return "redirect:/admin/series/sheets?name=" + enc(name);
-        }
-        flash.addFlashAttribute("saved", prettyName(name) + (dryRun() ? " (testovací režim)" : ""));
-        // Opted to author the template now → open the template editor.
-        if ("new".equals(mode) && createTemplate && !hasTemplateUpload) {
-            return "redirect:/admin/series/template?name=" + enc(name);
-        }
-        // Otherwise a freshly created series lands on its own edit page, where the toolbar
-        // offers the sheet editor and the cataloguing template.
-        if ("new".equals(mode)) {
-            return "redirect:/admin/series/edit?name=" + enc(name);
-        }
-        return "redirect:/admin/series";
+    public record SaveRequest(String mode, String originalName, String name, String descCs, String descEn,
+                              String thumbnailUrl, String field, String sheets, String groupby, String grid,
+                              String geojson, String template) {
     }
 
     /** Remove a series from content-definition.json (the grid geojson is left as an
@@ -243,49 +200,11 @@ public class SeriesEditorController {
         return "redirect:/admin/series";
     }
 
-    /** Phase 2: interactive map + per-sheet property editing for one series' grid. */
+    /** The standalone sheets page is folded into the workspace; keep the URL working. */
     @GetMapping("/admin/series/sheets")
-    public String sheets(@RequestParam String name, @RequestParam(required = false) String code,
-                         Model model, HttpServletRequest request) {
-        if (code != null && !code.isBlank()) {
-            authService.authenticate(code);
-            return "redirect:/admin/series/sheets?name=" + enc(name);
-        }
-        if (!gate(model, request)) {
-            return "admin/series-sheets";
-        }
-        JSONObject item = findByName(readContentDefinition(), name);
-        if (item == null) {
-            model.addAttribute("error", "Série \"" + name + "\" nebyla nalezena.");
-            return "admin/series-sheets";
-        }
-        model.addAttribute("seriesName", name);
-        model.addAttribute("prettyName", prettyName(name));
-        model.addAttribute("grid", item.optString("grid", ""));
-        return "admin/series-sheets";
-    }
-
-    /** AJAX save of the edited grid geojson (commits geojson/<grid>.json). */
-    @PostMapping("/admin/series/sheets/save")
-    @ResponseBody
-    public Map<String, Object> saveSheets(@RequestParam String name, @RequestParam String grid,
-                                          @RequestBody String geojson) {
-        if (!(authService.isAuthenticated() && authService.isAdmin())) {
-            return Map.of("success", false, "message", "Nejste přihlášen jako správce.");
-        }
-        try {
-            new JSONObject(geojson); // validate JSON
-        } catch (Exception e) {
-            return Map.of("success", false, "message", "Neplatný geojson: " + e.getMessage());
-        }
-        try {
-            githubWriteService.saveFile(authService.getToken(),
-                    "Edit sheets: " + prettyName(name), "geojson/" + grid + ".json", geojson);
-            return Map.of("success", true, "message",
-                    dryRun() ? "OK — testovací režim (necommitnuto)." : "Uloženo.");
-        } catch (Exception e) {
-            return Map.of("success", false, "message", String.valueOf(e.getMessage()));
-        }
+    public String sheetsRedirect(@RequestParam String name, @RequestParam(required = false) String code) {
+        if (code != null && !code.isBlank()) { authService.authenticate(code); }
+        return "redirect:/admin/series/edit?name=" + enc(name);
     }
 
     /** Admin loads the grid geojson from the WRITE repo (its own edits), fresh — the map
@@ -303,55 +222,24 @@ public class SeriesEditorController {
         }
     }
 
-    /** Load the series' MARC21 cataloguing template (template/<grid>.txt) for editing. */
+    /** The standalone template page is folded into the workspace; keep the URL working. */
     @GetMapping("/admin/series/template")
-    public String template(@RequestParam String name, @RequestParam(required = false) String code,
-                           Model model, HttpServletRequest request) {
-        if (code != null && !code.isBlank()) {
-            authService.authenticate(code);
-            return "redirect:/admin/series/template?name=" + enc(name);
-        }
-        if (!gate(model, request)) {
-            return "admin/series-template";
-        }
-        JSONObject item = findByName(readContentDefinition(), name);
-        if (item == null) {
-            model.addAttribute("error", "Série \"" + name + "\" nebyla nalezena.");
-            return "admin/series-template";
-        }
-        String grid = item.optString("grid", "");
-        model.addAttribute("seriesName", name);
-        model.addAttribute("prettyName", prettyName(name));
-        model.addAttribute("grid", grid);
-        model.addAttribute("templatePath", "template/" + grid + ".txt");
-        try {
-            model.addAttribute("templateContent", readRaw("template/" + grid + ".txt"));
-        } catch (Exception e) {
-            model.addAttribute("templateContent", "");
-            model.addAttribute("templateMissing", true);
-        }
-        return "admin/series-template";
+    public String templateRedirect(@RequestParam String name, @RequestParam(required = false) String code) {
+        if (code != null && !code.isBlank()) { authService.authenticate(code); }
+        return "redirect:/admin/series/edit?name=" + enc(name);
     }
 
-    /** AJAX save of the edited MARC21 template (commits template/<grid>.txt). */
-    @PostMapping("/admin/series/template/save")
+    /** Admin loads the MARC21 template text from the WRITE repo (its own edits), fresh. */
+    @GetMapping(value = "/admin/series/template/data", produces = "text/plain;charset=UTF-8")
     @ResponseBody
-    public Map<String, Object> saveTemplate(@RequestParam String name, @RequestParam String grid,
-                                            @RequestBody String content) {
+    public ResponseEntity<String> templateData(@RequestParam String grid) {
         if (!(authService.isAuthenticated() && authService.isAdmin())) {
-            return Map.of("success", false, "message", "Nejste přihlášen jako správce.");
-        }
-        String err = validateTemplate(content);
-        if (err != null) {
-            return Map.of("success", false, "message", err);
+            return ResponseEntity.status(403).build();
         }
         try {
-            githubWriteService.saveFile(authService.getToken(),
-                    "Edit template: " + prettyName(name), "template/" + grid + ".txt", content);
-            return Map.of("success", true, "message",
-                    dryRun() ? "OK — testovací režim (necommitnuto)." : "Uloženo.");
+            return ResponseEntity.ok(readRaw("template/" + grid + ".txt"));
         } catch (Exception e) {
-            return Map.of("success", false, "message", String.valueOf(e.getMessage()));
+            return ResponseEntity.notFound().build();
         }
     }
 
@@ -397,19 +285,7 @@ public class SeriesEditorController {
         return admin;
     }
 
-    private void fillForm(Model m, String mode, String originalName, String name, String grid, String sheets,
-                          String field, String groupby, String thumbnailUrl, String descCs, String descEn) {
-        m.addAttribute("mode", mode);
-        m.addAttribute("originalName", originalName);
-        m.addAttribute("f_name", name);
-        m.addAttribute("f_grid", grid);
-        m.addAttribute("f_sheets", sheets);
-        m.addAttribute("f_field", field);
-        m.addAttribute("f_groupby", groupby);
-        m.addAttribute("f_thumbnailUrl", thumbnailUrl);
-        m.addAttribute("f_descCs", descCs);
-        m.addAttribute("f_descEn", descEn);
-    }
+    private static String trim(String s) { return s == null ? "" : s.trim(); }
 
     private static String validate(String name, String grid, String sheets, String field,
                                    String groupby, String thumbnailUrl) {
@@ -420,27 +296,6 @@ public class SeriesEditorController {
         if (groupby == null || groupby.isBlank()) return "Vyplň pravidlo groupby.";
         if (thumbnailUrl == null || thumbnailUrl.isBlank()) return "Vyplň URL náhledu.";
         return null;
-    }
-
-    private void addSheetPreview(Model model, String grid) {
-        if (grid == null || grid.isBlank()) {
-            return;
-        }
-        try {
-            String raw = readRaw("geojson/" + grid + ".json");
-            JSONArray features = new JSONObject(raw).getJSONArray("features");
-            List<SheetRow> preview = new ArrayList<>();
-            for (int i = 0; i < features.length() && i < SHEET_PREVIEW_LIMIT; i++) {
-                JSONObject p = features.getJSONObject(i).optJSONObject("properties");
-                if (p == null) continue;
-                preview.add(new SheetRow(p.optString("SHEET", ""), p.optString("TITLE", ""),
-                        p.optString("KOLONNE", "")));
-            }
-            model.addAttribute("sheetCount", features.length());
-            model.addAttribute("sheetPreview", preview);
-        } catch (Exception e) {
-            model.addAttribute("sheetError", "Mřížku se nepodařilo načíst: " + e.getMessage());
-        }
     }
 
     private List<JSONObject> readContentDefinition() {
@@ -538,8 +393,5 @@ public class SeriesEditorController {
     }
 
     public record SeriesRow(String name, String prettyName, String grid) {
-    }
-
-    public record SheetRow(String sheet, String title, String kolonne) {
     }
 }
