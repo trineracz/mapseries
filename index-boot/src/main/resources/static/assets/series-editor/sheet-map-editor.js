@@ -153,7 +153,6 @@ window.SheetMapEditor = (function () {
             var p = feature.properties || (feature.properties = {});
             var html = '<h5>List: <span class="sel">' + esc(p.SHEET || p.TITLE || "—") + '</span>' +
                 ' <button id="delSheetBtn" class="btn btn-xs btn-danger">Smazat list</button></h5>';
-            html += '<p class="hint">Rohy = velikost · stěny = jeden směr · modrý střed = posun · zelený nahoře = rotace.</p>';
             fieldKeys().forEach(function (key) {
                 var val = p[key] == null ? "" : String(p[key]);
                 var big = val.length > 40;
@@ -433,18 +432,31 @@ window.SheetMapEditor = (function () {
             loadGeojson({ type: "FeatureCollection", features: feats }, true);
         });
 
-        // Two-click bounding-box picker.
+        // Two-click bounding-box picker with crosshair cursor + live preview rectangle.
         function gridPick(onComplete) {
-            var pts = [];
+            var pts = [], preview = null, mapEl = map.getContainer();
+            mapEl.style.cursor = "crosshair";
+            function onMove(ev) {
+                if (pts.length !== 1) { return; }
+                var b = L.latLngBounds(pts[0], ev.latlng);
+                if (preview) { preview.setBounds(b); }
+                else { preview = L.rectangle(b, { color: "#b23a2e", weight: 1, dashArray: "4,4", fillOpacity: 0.1 }).addTo(map); }
+            }
+            function cleanup() {
+                map.off("click", onClick); map.off("mousemove", onMove);
+                if (preview) { map.removeLayer(preview); }
+                mapEl.style.cursor = "";
+            }
             function onClick(ev) {
                 pts.push(ev.latlng);
                 if (pts.length === 2) {
                     var b = L.latLngBounds(pts[0], pts[1]);
-                    map.off("click", onClick);
+                    cleanup();
                     onComplete(b);
                 }
             }
             map.on("click", onClick);
+            map.on("mousemove", onMove);
         }
 
         // ---- keys: undo + axis/rotation snap ----

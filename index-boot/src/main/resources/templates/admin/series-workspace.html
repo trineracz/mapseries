@@ -52,14 +52,14 @@
             background: rgba(255,255,255,0.75); border: 1px solid #2e7d32; border-radius: 50%; }
         .vhandle { background: #fff; border: 2px solid #b23a2e; border-radius: 2px; box-sizing: border-box; cursor: nwse-resize; }
         .rothandle { background: #2e7d32; border: 2px solid #fff; border-radius: 50%; box-sizing: border-box; cursor: grab; }
-        .edgehandle { background: #fff; border: 2px solid #b23a2e; box-sizing: border-box; cursor: move; }
+        .edgehandle { background: #fff; border: 2px solid #b23a2e; box-sizing: border-box; cursor: ew-resize; }
         .movehandle { background: #3388ff; border: 2px solid #fff; border-radius: 50%; box-sizing: border-box; cursor: move; }
 
         /* template editor */
-        .tpl-layout { display: flex; gap: 16px; align-items: stretch; }
-        .tpl-col { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
+        .tpl-layout { display: flex; flex-direction: column; gap: 12px; }
+        .tpl-col { min-width: 0; display: flex; flex-direction: column; }
         .tpl-col h5 { margin: 0 0 6px; }
-        .tpl-editor { position: relative; height: 58vh; }
+        .tpl-editor { position: relative; height: 42vh; }
         #tplBackdrop, #tplText {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0; margin: 0;
             font-family: monospace; font-size: 12px; line-height: 1.35; padding: 8px;
@@ -70,7 +70,7 @@
         #tplText.bad { border-color: #b23a2e; }
         #synMsg.ok { color: #2e7d32; }
         #synMsg.err { color: #b23a2e; }
-        .tpl-preview { height: 58vh; overflow-y: auto; border: 1px solid #ccc; padding: 8px; background: #fafafa; }
+        .tpl-preview { max-height: 40vh; overflow-y: auto; border: 1px solid #ccc; padding: 8px; background: #fafafa; }
         .tpl-preview table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .tpl-preview th, .tpl-preview td { border-bottom: 1px solid #e5e5e5; padding: 4px 6px; text-align: left; vertical-align: top; }
         .tpl-preview th { color: #555; font-weight: 600; }
@@ -230,20 +230,20 @@
                 </details>
 
                 <!-- ④ NAPOJENÍ NA KATALOG (technické) -->
-                <details class="ws-card ws-advanced" open="open">
+                <details class="ws-card ws-advanced">
                     <summary><span class="ws-num">4</span> Napojení na katalog <span class="sub">(technické — předvyplněno)</span></summary>
                     <div class="ws-body">
-                        <div class="help"><i class="help-i">i</i>Tady se nastavuje, jak katalog pozná, že mapa patří do této série a který je to list. Skoro vždy nech tak, jak je předvyplněno.</div>
+                        <div class="help"><i class="help-i">i</i>Tady se nastavuje, jak katalog pozná, že mapa patří do této série a který je to list.</div>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label>Název série je v MARC poli</label>
-                                    <div class="help">Kde katalog hledá název série. Skoro vždy <code>490a</code>.</div>
+                                    <div class="help">Kde katalog hledá název série (obvykle <code>490a</code>).</div>
                                     <input type="text" class="form-control" name="field" th:value="${f_field}"/>
                                 </div>
                                 <div class="form-group">
                                     <label>Číslo listu je v MARC poli</label>
-                                    <div class="help">Kde katalog hledá číslo/svazek listu. Skoro vždy <code>490v</code>.</div>
+                                    <div class="help">Kde katalog hledá číslo/svazek listu (obvykle <code>490v</code>).</div>
                                     <input type="text" class="form-control" name="sheets" th:value="${f_sheets}"/>
                                 </div>
                                 <div class="form-group">
@@ -255,14 +255,14 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label>Jak z čísla listu udělat ID listu</label>
-                                    <div class="help">Číslo listu v záznamu bývá „ušpiněné" (např. <code>1, 1885</code>). Tímhle z něj vyřízneš čisté ID, které sedí na mřížku.</div>
+                                    <div class="help">Číslo listu v záznamu bývá delší, než je vlastní ID (např. <code>7162, 1885</code>). Tímhle z něj vyřízneš čisté ID listu (<code>7162</code>), které sedí na mřížku.</div>
                                     <label class="gb-opt"><input type="radio" name="gbMode" value="prefix"/> Prvních
                                         <input type="number" id="gbN" min="1" value="4" style="width:56px"/> znaků</label>
                                     <label class="gb-opt"><input type="radio" name="gbMode" value="toComma"/> Text do první čárky</label>
                                     <label class="gb-opt"><input type="radio" name="gbMode" value="custom"/> Vlastní výraz
                                         <input type="text" id="gbCustom" class="form-control" style="margin-top:4px" placeholder="field.substring(0,4)"/></label>
                                     <div class="gb-test">
-                                        Test: <input type="text" id="gbTestIn" value="1, 1885" style="width:120px"/>
+                                        Test: <input type="text" id="gbTestIn" value="7162, 1885" style="width:120px"/>
                                         → <code id="gbTestOut">?</code>
                                     </div>
                                 </div>
