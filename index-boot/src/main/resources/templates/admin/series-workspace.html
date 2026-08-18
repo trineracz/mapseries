@@ -260,6 +260,7 @@
                                         Test: <input type="text" id="gbTestIn" value="7162, 1885" style="width:120px"/>
                                         → <code id="gbTestOut">?</code>
                                     </div>
+                                    <div class="help" style="margin-top:6px">Použitý výraz: <code id="gbExpr"></code></div>
                                 </div>
                             </div>
                         </div>
@@ -364,6 +365,8 @@
 
     var gbN = document.getElementById("gbN"), gbCustom = document.getElementById("gbCustom");
     var gbTestIn = document.getElementById("gbTestIn"), gbTestOut = document.getElementById("gbTestOut");
+    var gbExpr = document.getElementById("gbExpr");
+    var lastBuiltExpr = "field.substring(0,4)";
     function gbMode() { var r = $("[name=gbMode]:checked"); return r ? r.value : "prefix"; }
     function currentGroupby() {
         var m = gbMode();
@@ -377,9 +380,17 @@
         catch (e) { out = "⚠ " + e.message; }
         gbTestOut.textContent = out === undefined ? "(prázdné)" : String(out);
     }
+    // Show the built expression live; when switching to „Vlastní", seed it from the last
+    // prepared recipe so the user sees & can tweak how e.g. „text do čárky" is written.
+    function refreshGb() {
+        if (gbMode() !== "custom") { lastBuiltExpr = currentGroupby(); }
+        else if (!(gbCustom.value || "").trim()) { gbCustom.value = lastBuiltExpr; }
+        gbExpr.textContent = currentGroupby();
+        runGbTest();
+    }
     ["change", "input"].forEach(function (ev) {
-        document.querySelectorAll("[name=gbMode]").forEach(function (r) { r.addEventListener(ev, runGbTest); });
-        gbN.addEventListener(ev, runGbTest); gbCustom.addEventListener(ev, runGbTest); gbTestIn.addEventListener(ev, runGbTest);
+        document.querySelectorAll("[name=gbMode]").forEach(function (r) { r.addEventListener(ev, refreshGb); });
+        gbN.addEventListener(ev, refreshGb); gbCustom.addEventListener(ev, refreshGb); gbTestIn.addEventListener(ev, refreshGb);
     });
     // preselect groupby from server value
     (function () {
@@ -388,7 +399,7 @@
         if (mp) { $("[name=gbMode][value=prefix]").checked = true; gbN.value = mp[1]; }
         else if (gb.replace(/\s/g, "") === "field.substring(0,field.indexOf(','))") { $("[name=gbMode][value=toComma]").checked = true; }
         else { $("[name=gbMode][value=custom]").checked = true; gbCustom.value = gb; }
-        runGbTest();
+        refreshGb();
     })();
 
     // ---------- save (one atomic commit) ----------

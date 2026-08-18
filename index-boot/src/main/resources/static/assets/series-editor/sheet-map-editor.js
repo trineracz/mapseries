@@ -162,6 +162,17 @@ window.SheetMapEditor = (function () {
                     : '<input type="text" data-key="' + esc(key) + '" value="' + esc(val) + '"/>';
                 html += '</div>';
             });
+            html += '<div id="coordBox" class="coords">' +
+                '<div class="hint" style="margin-top:8px">Souřadnice — dva protilehlé rohy + úhel (přesné umístění):</div>' +
+                '<div class="prop-row"><label>Roh 1 (šířka° / délka°)</label>' +
+                    '<input type="number" step="any" id="cLatA" style="width:48%"/> ' +
+                    '<input type="number" step="any" id="cLngA" style="width:48%"/></div>' +
+                '<div class="prop-row"><label>Roh 2 — protilehlý (šířka° / délka°)</label>' +
+                    '<input type="number" step="any" id="cLatC" style="width:48%"/> ' +
+                    '<input type="number" step="any" id="cLngC" style="width:48%"/></div>' +
+                '<div class="prop-row"><label>Úhel (°)</label>' +
+                    '<input type="number" step="any" id="cAng" style="width:48%"/></div>' +
+                '</div>';
             props.innerHTML = html;
             var db = document.getElementById("delSheetBtn");
             if (db) { db.addEventListener("click", deleteSelected); }
@@ -173,10 +184,52 @@ window.SheetMapEditor = (function () {
                     }
                 });
             });
+            ["cLatA", "cLngA", "cLatC", "cLngC", "cAng"].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) { el.addEventListener("change", function () { pushHistory(); applyCoordEdit(); }); }
+            });
+            updateCoordInputs();
         }
 
         // ---- selection + rectangle handles ----
         function clearHandles() { handles.forEach(function (m) { map.removeLayer(m); }); handles = []; }
+
+        // After any drag: stop flag, reposition the sheet-number labels, refresh coord inputs.
+        function endDrag() { isDragging = false; updateLabels(); updateCoordInputs(); }
+
+        // ---- editable coordinates of the selected sheet (two opposite corners + angle) ----
+        function cornerLatLng(sx, sy) { return map.options.crs.unproject(cornerPt(selRect, sx, sy)); }
+        function setCoord(id, v) {
+            var el = document.getElementById(id);
+            if (el && document.activeElement !== el) { el.value = Math.round(v * 1e6) / 1e6; }
+        }
+        function coordNum(id) { var el = document.getElementById(id); return el ? parseFloat(el.value) : NaN; }
+        function updateCoordInputs() {
+            if (!selectedFeature || !selRect || !document.getElementById("coordBox")) { return; }
+            var a = cornerLatLng(-1, -1), c = cornerLatLng(1, 1);
+            setCoord("cLatA", a.lat); setCoord("cLngA", a.lng);
+            setCoord("cLatC", c.lat); setCoord("cLngC", c.lng);
+            setCoord("cAng", selRect.angle * 180 / Math.PI);
+        }
+        // Rebuild the rectangle from the two entered corners + angle — same math as a
+        // corner drag (the two points define it; width/height/centre follow).
+        function applyCoordEdit() {
+            if (!selectedFeature || !selRect) { return; }
+            var aLat = coordNum("cLatA"), aLng = coordNum("cLngA"), cLat = coordNum("cLatC"), cLng = coordNum("cLngC");
+            if ([aLat, aLng, cLat, cLng].some(isNaN)) { return; }
+            var angDeg = coordNum("cAng"); if (isNaN(angDeg)) { angDeg = 0; }
+            var A = projLL(L.latLng(aLat, aLng)), C = projLL(L.latLng(cLat, cLng));
+            var angle = angDeg * Math.PI / 180, ax = axes(angle);
+            var dx = C.x - A.x, dy = C.y - A.y;
+            selRect = {
+                cx: (A.x + C.x) / 2, cy: (A.y + C.y) / 2,
+                w: Math.max(1, Math.abs(dx * ax.ux.x + dy * ax.ux.y)),
+                h: Math.max(1, Math.abs(dx * ax.uy.x + dy * ax.uy.y)),
+                angle: angle
+            };
+            applyRect(selectedFeature, selRect, selectedLayer);
+            repositionHandles(); updateLabels(); updateCoordInputs();
+        }
 
         function deselect() {
             if (selectedLayer) { selectedLayer.setStyle(baseStyle); }
@@ -201,7 +254,7 @@ window.SheetMapEditor = (function () {
                 m._sgn = sgn;
                 m.on("dragstart", function () { pushHistory(); isDragging = true; clearGhosts(); });
                 m.on("drag", function () { resizeByCorner(m); });
-                m.on("dragend", function () { isDragging = false; });
+                m.on("dragend", endDrag);
                 m.addTo(map); handles.push(m);
             });
             // edge handles (resize one dimension by dragging a side)
@@ -212,7 +265,7 @@ window.SheetMapEditor = (function () {
                 em._edge = e;
                 em.on("dragstart", function () { pushHistory(); isDragging = true; clearGhosts(); });
                 em.on("drag", function () { resizeByEdge(em); });
-                em.on("dragend", function () { isDragging = false; });
+                em.on("dragend", endDrag);
                 em.addTo(map); handles.push(em);
             });
             // move handle (drag the whole rectangle)
@@ -221,7 +274,7 @@ window.SheetMapEditor = (function () {
             mm._move = true;
             mm.on("dragstart", function () { pushHistory(); isDragging = true; clearGhosts(); });
             mm.on("drag", function () { moveByCenter(mm); });
-            mm.on("dragend", function () { isDragging = false; });
+            mm.on("dragend", endDrag);
             mm.addTo(map); handles.push(mm);
             // rotation handle above the top edge
             var A = axes(selRect.angle), rpt = L.point(
@@ -229,7 +282,7 @@ window.SheetMapEditor = (function () {
             var rm = L.marker(map.options.crs.unproject(rpt), { draggable: true, icon: rotIcon });
             rm.on("dragstart", function () { pushHistory(); isDragging = true; clearGhosts(); });
             rm.on("drag", function () { rotateByHandle(rm); });
-            rm.on("dragend", function () { isDragging = false; });
+            rm.on("dragend", endDrag);
             rm.addTo(map); handles.push(rm); rm._rot = true;
         }
         function edgeMidPt(rc, axisKey, sign) {
