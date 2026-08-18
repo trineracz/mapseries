@@ -5,7 +5,7 @@
  * Expects this HTML to already exist on the page:
  *   #map                       (the Leaflet map container)
  *   #props                     (side panel — selected-sheet property editor)
- *   #rectBtn #pickBtn #genBtn #undoBtn #rows #cols #pickStatus  (toolbar)
+ *   #pickBtn #rows #cols #pickStatus #undoBtn  (toolbar)
  *
  * Usage:  var api = SheetMapEditor.init({ initialGeojson: {...} });
  *         api.getGeojson();        // current FeatureCollection (live reference)
@@ -388,11 +388,20 @@ window.SheetMapEditor = (function () {
             });
         }
 
-        // ---- create: single rectangle (2 corners) ----
-        document.getElementById("rectBtn").addEventListener("click", function () {
-            document.getElementById("pickStatus").textContent = "klikni dva protilehlé rohy…";
-            gridPick(function (bounds) {
+        // ---- create: one unified tool — pick an area (drag OR click-click), then
+        //      fill it with a rows×cols grid (1×1 = a single sheet). ----
+        document.getElementById("pickBtn").addEventListener("click", function () {
+            document.getElementById("pickStatus").textContent = "táhni myší nebo klikni dva rohy…";
+            pickArea(function (bounds) {
                 document.getElementById("pickStatus").textContent = "";
+                var rows = parseInt(document.getElementById("rows").value, 10) || 1;
+                var cols = parseInt(document.getElementById("cols").value, 10) || 1;
+                generateGrid(bounds, Math.max(1, rows), Math.max(1, cols));
+            });
+        });
+
+        function generateGrid(bounds, rows, cols) {
+            if (rows === 1 && cols === 1) {           // single sheet appended + selected
                 pushHistory();
                 var sw = projLL(bounds.getSouthWest()), ne = projLL(bounds.getNorthEast());
                 var rc = { cx: (sw.x + ne.x) / 2, cy: (sw.y + ne.y) / 2,
@@ -400,27 +409,16 @@ window.SheetMapEditor = (function () {
                 var f = { type: "Feature", properties: newProps(), geometry: { type: "Polygon", coordinates: [ringFromRect(rc)] } };
                 geojson.features.push(f); loadGeojson(geojson, false);
                 var lyr = layerOf.get(f); if (lyr) { selectFeature(f, lyr); }
-            });
-        });
-
-        // ---- create: regular grid (2 corners + rows/cols) ----
-        var pickedBounds = null;
-        document.getElementById("pickBtn").addEventListener("click", function () {
-            document.getElementById("pickStatus").textContent = "klikni dva rohy oblasti…";
-            gridPick(function (bounds) {
-                pickedBounds = bounds;
-                document.getElementById("pickStatus").textContent = "oblast vybrána ✔";
-                document.getElementById("genBtn").disabled = false;
-            });
-        });
-        document.getElementById("genBtn").addEventListener("click", function () {
-            if (!pickedBounds) { return; }
-            var rows = parseInt(document.getElementById("rows").value, 10) || 1;
-            var cols = parseInt(document.getElementById("cols").value, 10) || 1;
-            if (!confirm("Vygenerovat mřížku " + rows + "×" + cols + " a nahradit stávající listy?")) { return; }
+                return;
+            }
+            var feats = (geojson.features || []).slice();
+            if (feats.length && confirm("Vygenerovat mřížku " + rows + "×" + cols +
+                    " a NAHRADIT stávající listy?\n(Zrušit = přidat k nim.)")) {
+                feats = [];
+            }
             pushHistory();
-            var s = pickedBounds.getSouth(), n = pickedBounds.getNorth(), w = pickedBounds.getWest(), e = pickedBounds.getEast();
-            var dLat = (n - s) / rows, dLon = (e - w) / cols, feats = [];
+            var s = bounds.getSouth(), n = bounds.getNorth(), w = bounds.getWest(), e = bounds.getEast();
+            var dLat = (n - s) / rows, dLon = (e - w) / cols;
             for (var rr = 0; rr < rows; rr++) {
                 for (var cc = 0; cc < cols; cc++) {
                     var top = n - rr * dLat, bot = n - (rr + 1) * dLat, lft = w + cc * dLon, rgt = w + (cc + 1) * dLon;
@@ -430,33 +428,38 @@ window.SheetMapEditor = (function () {
                 }
             }
             loadGeojson({ type: "FeatureCollection", features: feats }, true);
-        });
+        }
 
-        // Two-click bounding-box picker with crosshair cursor + live preview rectangle.
-        function gridPick(onComplete) {
-            var pts = [], preview = null, mapEl = map.getContainer();
+        // Area picker: crosshair + live preview; supports drag (down→up) AND click-click.
+        function pickArea(onComplete) {
+            var mapEl = map.getContainer();
             mapEl.style.cursor = "crosshair";
-            function onMove(ev) {
-                if (pts.length !== 1) { return; }
-                var b = L.latLngBounds(pts[0], ev.latlng);
-                if (preview) { preview.setBounds(b); }
-                else { preview = L.rectangle(b, { color: "#b23a2e", weight: 1, dashArray: "4,4", fillOpacity: 0.1 }).addTo(map); }
+            map.dragging.disable();                   // don't pan the map while picking
+            var downLL = null, firstLL = null, preview = null, moved = false;
+            function draw(a, b) {
+                var bb = L.latLngBounds(a, b);
+                if (preview) { preview.setBounds(bb); }
+                else { preview = L.rectangle(bb, { color: "#b23a2e", weight: 1, dashArray: "4,4", fillOpacity: 0.1 }).addTo(map); }
             }
             function cleanup() {
-                map.off("click", onClick); map.off("mousemove", onMove);
+                map.off("mousedown", onDown); map.off("mousemove", onMove); map.off("mouseup", onUp);
+                map.dragging.enable();
                 if (preview) { map.removeLayer(preview); }
                 mapEl.style.cursor = "";
             }
-            function onClick(ev) {
-                pts.push(ev.latlng);
-                if (pts.length === 2) {
-                    var b = L.latLngBounds(pts[0], pts[1]);
-                    cleanup();
-                    onComplete(b);
-                }
+            function done(a, b) { cleanup(); onComplete(L.latLngBounds(a, b)); }
+            function onDown(ev) { downLL = ev.latlng; moved = false; }
+            function onMove(ev) {
+                if (downLL) { moved = true; draw(downLL, ev.latlng); }   // dragging out an area
+                else if (firstLL) { draw(firstLL, ev.latlng); }          // click-click: preview to cursor
             }
-            map.on("click", onClick);
-            map.on("mousemove", onMove);
+            function onUp(ev) {
+                if (downLL && moved) { done(downLL, ev.latlng); return; } // drag select
+                if (!firstLL) { firstLL = downLL || ev.latlng; }          // first click = first corner
+                else { done(firstLL, ev.latlng); return; }                // second click = done
+                downLL = null; moved = false;
+            }
+            map.on("mousedown", onDown); map.on("mousemove", onMove); map.on("mouseup", onUp);
         }
 
         // ---- keys: undo + axis/rotation snap ----

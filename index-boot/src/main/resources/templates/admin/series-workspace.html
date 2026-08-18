@@ -176,20 +176,15 @@
                             <div class="sheets-map"><div id="map"></div></div>
                             <div class="sheets-side" id="side">
                                 <div class="tool">
-                                    <strong>Vytvořit</strong>
+                                    <strong>Vytvořit listy</strong>
                                     <div class="prop-row" style="margin-top:6px">
-                                        <button type="button" id="rectBtn" class="btn btn-sm btn-primary">Nový obdélník (2 rohy)</button>
-                                        <span id="pickStatus"></span>
+                                        <button type="button" id="pickBtn" class="btn btn-sm btn-primary">Vybrat oblast na mapě</button>
+                                        <label>Ř</label><input type="number" id="rows" min="1" value="1"/>
+                                        <label>S</label><input type="number" id="cols" min="1" value="1"/>
                                     </div>
-                                    <hr style="margin:8px 0"/>
-                                    <div class="hint">…nebo pravidelná mřížka:</div>
-                                    <div class="prop-row">
-                                        <button type="button" id="pickBtn" class="btn btn-sm btn-default">Vybrat oblast (2 rohy)</button>
-                                        <label>Ř</label><input type="number" id="rows" min="1" value="4"/>
-                                        <label>S</label><input type="number" id="cols" min="1" value="4"/>
-                                        <button type="button" id="genBtn" class="btn btn-sm btn-warning" disabled="disabled">Generovat</button>
-                                    </div>
-                                    <div class="prop-row">
+                                    <div class="hint">Klikni „Vybrat oblast", pak <strong>táhni myší</strong> nebo <strong>klikni dva rohy</strong>. Ř×S = řádky × sloupce (1×1 = jeden list).</div>
+                                    <span id="pickStatus"></span>
+                                    <div class="prop-row" style="margin-top:6px">
                                         <button type="button" id="undoBtn" class="btn btn-sm btn-default"><i class="fas fa-undo"></i> Zpět</button>
                                     </div>
                                 </div>
