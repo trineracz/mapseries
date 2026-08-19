@@ -84,6 +84,7 @@
         .hint.err { color: #b23a2e; }
 
         .gb-opt { display: block; margin: 4px 0; }
+        .gb-ex { color: #888; font-family: monospace; font-size: 12px; margin-left: 8px; }
         .gb-test { background: #eef3ff; border: 1px solid #cdd9f5; padding: 6px 8px; border-radius: 4px; margin-top: 6px; font-size: 13px; }
         .gb-test code { background: #fff; padding: 1px 4px; border: 1px solid #ddd; }
         #saveBar { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #ddd;
@@ -252,15 +253,16 @@
                                     <label>Jak z čísla listu udělat ID listu</label>
                                     <div class="help">Číslo listu v záznamu bývá delší, než je vlastní ID (např. <code>7162, 1885</code>). Tímhle z něj vyřízneš čisté ID listu (<code>7162</code>), které sedí na mřížku.</div>
                                     <label class="gb-opt"><input type="radio" name="gbMode" value="prefix"/> Prvních
-                                        <input type="number" id="gbN" min="1" value="4" style="width:56px"/> znaků</label>
-                                    <label class="gb-opt"><input type="radio" name="gbMode" value="toComma"/> Text do první čárky</label>
-                                    <label class="gb-opt"><input type="radio" name="gbMode" value="custom"/> Vlastní výraz
-                                        <input type="text" id="gbCustom" class="form-control" style="margin-top:4px" placeholder="field.substring(0,4)"/></label>
+                                        <input type="number" id="gbN" min="1" value="4" style="width:56px"/> znaků
+                                        <code class="gb-ex" id="gbExPrefix"></code></label>
+                                    <label class="gb-opt"><input type="radio" name="gbMode" value="toComma"/> Text do první čárky
+                                        <code class="gb-ex">field.substring(0, field.indexOf(','))</code></label>
+                                    <label class="gb-opt"><input type="radio" name="gbMode" value="custom"/> Vlastní výraz</label>
+                                    <input type="text" id="gbCustom" class="form-control" placeholder="field.substring(0,4)"/>
                                     <div class="gb-test">
                                         Test: <input type="text" id="gbTestIn" value="7162, 1885" style="width:120px"/>
                                         → <code id="gbTestOut">?</code>
                                     </div>
-                                    <div class="help" style="margin-top:6px">Použitý výraz: <code id="gbExpr"></code></div>
                                 </div>
                             </div>
                         </div>
@@ -365,7 +367,7 @@
 
     var gbN = document.getElementById("gbN"), gbCustom = document.getElementById("gbCustom");
     var gbTestIn = document.getElementById("gbTestIn"), gbTestOut = document.getElementById("gbTestOut");
-    var gbExpr = document.getElementById("gbExpr");
+    var gbExPrefix = document.getElementById("gbExPrefix");
     var lastBuiltExpr = "field.substring(0,4)";
     function gbMode() { var r = $("[name=gbMode]:checked"); return r ? r.value : "prefix"; }
     function currentGroupby() {
@@ -383,9 +385,9 @@
     // Show the built expression live; when switching to „Vlastní", seed it from the last
     // prepared recipe so the user sees & can tweak how e.g. „text do čárky" is written.
     function refreshGb() {
+        gbExPrefix.textContent = "field.substring(0," + (parseInt(gbN.value, 10) || 4) + ")";
         if (gbMode() !== "custom") { lastBuiltExpr = currentGroupby(); }
         else if (!(gbCustom.value || "").trim()) { gbCustom.value = lastBuiltExpr; }
-        gbExpr.textContent = currentGroupby();
         runGbTest();
     }
     ["change", "input"].forEach(function (ev) {

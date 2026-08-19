@@ -184,10 +184,12 @@ window.SheetMapEditor = (function () {
                     }
                 });
             });
-            ["cLatA", "cLngA", "cLatC", "cLngC", "cAng"].forEach(function (id) {
+            ["cLatA", "cLngA", "cLatC", "cLngC"].forEach(function (id) {
                 var el = document.getElementById(id);
-                if (el) { el.addEventListener("change", function () { pushHistory(); applyCoordEdit(); }); }
+                if (el) { el.addEventListener("change", function () { pushHistory(); applyCornerEdit(); }); }
             });
+            var angEl = document.getElementById("cAng");
+            if (angEl) { angEl.addEventListener("change", function () { pushHistory(); applyAngleEdit(); }); }
             updateCoordInputs();
         }
 
@@ -211,22 +213,25 @@ window.SheetMapEditor = (function () {
             setCoord("cLatC", c.lat); setCoord("cLngC", c.lng);
             setCoord("cAng", selRect.angle * 180 / Math.PI);
         }
-        // Rebuild the rectangle from the two entered corners + angle — same math as a
-        // corner drag (the two points define it; width/height/centre follow).
-        function applyCoordEdit() {
+        // Editing a corner = same as dragging it: keep the current angle, recompute
+        // centre/width/height from the two opposite corners.
+        function applyCornerEdit() {
             if (!selectedFeature || !selRect) { return; }
             var aLat = coordNum("cLatA"), aLng = coordNum("cLngA"), cLat = coordNum("cLatC"), cLng = coordNum("cLngC");
             if ([aLat, aLng, cLat, cLng].some(isNaN)) { return; }
-            var angDeg = coordNum("cAng"); if (isNaN(angDeg)) { angDeg = 0; }
             var A = projLL(L.latLng(aLat, aLng)), C = projLL(L.latLng(cLat, cLng));
-            var angle = angDeg * Math.PI / 180, ax = axes(angle);
-            var dx = C.x - A.x, dy = C.y - A.y;
-            selRect = {
-                cx: (A.x + C.x) / 2, cy: (A.y + C.y) / 2,
-                w: Math.max(1, Math.abs(dx * ax.ux.x + dy * ax.ux.y)),
-                h: Math.max(1, Math.abs(dx * ax.uy.x + dy * ax.uy.y)),
-                angle: angle
-            };
+            var ax = axes(selRect.angle), dx = C.x - A.x, dy = C.y - A.y;
+            selRect.cx = (A.x + C.x) / 2; selRect.cy = (A.y + C.y) / 2;
+            selRect.w = Math.max(1, Math.abs(dx * ax.ux.x + dy * ax.ux.y));
+            selRect.h = Math.max(1, Math.abs(dx * ax.uy.x + dy * ax.uy.y));
+            applyRect(selectedFeature, selRect, selectedLayer);
+            repositionHandles(); updateLabels(); updateCoordInputs();
+        }
+        // Editing the angle = rotate the sheet in place around its centre (keep size).
+        function applyAngleEdit() {
+            if (!selectedFeature || !selRect) { return; }
+            var deg = coordNum("cAng"); if (isNaN(deg)) { return; }
+            selRect.angle = deg * Math.PI / 180;
             applyRect(selectedFeature, selRect, selectedLayer);
             repositionHandles(); updateLabels(); updateCoordInputs();
         }
