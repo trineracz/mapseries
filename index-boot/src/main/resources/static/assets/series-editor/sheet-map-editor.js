@@ -105,7 +105,7 @@ window.SheetMapEditor = (function () {
                 Object.keys(f.properties || {}).forEach(function (k) { set[k] = true; });
             });
             var keys = Object.keys(set);
-            return keys.length ? keys : ["SHEET", "TITLE"];
+            return keys.length ? keys : ["SHEET"];
         }
         // Fields whose value is the same across ALL sheets = the series constants; used
         // to pre-fill new sheets automatically even without a manually set default.
