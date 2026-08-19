@@ -34,6 +34,7 @@ window.SheetMapEditor = (function () {
         var ghostTimer = null;
         var isDragging = false, snapKey = false;
         var history = [], MAX_HISTORY = 30;
+        var suggested = [];               // column names the template wants (via attr)
         var baseStyle = { color: "#3388ff", weight: 1, fillOpacity: 0.08 };
         var selStyle = { color: "#b23a2e", weight: 3, fillOpacity: 0.20 };
         var vertexIcon = L.divIcon({ className: "vhandle", iconSize: [11, 11] });
@@ -147,6 +148,79 @@ window.SheetMapEditor = (function () {
         }
         function sheetExists(no) {
             return (geojson.features || []).some(function (f) { return String((f.properties || {}).SHEET) === String(no); });
+        }
+
+        // ---- column manager: the per-sheet property columns (catalog fields like N245A) ----
+        function renderColumns() {
+            var box = document.getElementById("colMgr");
+            if (!box) { return; }
+            var keys = fieldKeys(), has = {};
+            keys.forEach(function (k) { has[k] = true; });
+            var html = '<strong>Sloupce listů</strong>' +
+                '<div class="hint">Katalogizační pole, která má každý list. Šablona je tahá přes <code>attr</code> (např. N245A).</div>';
+            if (!(geojson.features || []).length) {
+                html += '<div class="hint">Nejdřív vytvoř aspoň jeden list, pak sem přidávej sloupce.</div>';
+            }
+            keys.forEach(function (k) {
+                html += '<div class="col-row"><span class="cname">' + esc(k) + '</span>' +
+                    '<button type="button" class="btn btn-xs btn-link" data-cren="' + esc(k) + '">✎</button>' +
+                    (k === "SHEET" ? "" : '<button type="button" class="btn btn-xs btn-link text-danger" data-cdel="' + esc(k) + '">×</button>') +
+                    '</div>';
+            });
+            var missing = suggested.filter(function (a) { return !has[a]; });
+            if (missing.length) {
+                html += '<div class="hint" style="margin-top:6px">Šablona chce i tato pole:</div><div>';
+                missing.forEach(function (a) { html += '<button type="button" class="btn btn-xs btn-default" data-cadd="' + esc(a) + '">+ ' + esc(a) + '</button> '; });
+                html += '</div>';
+            }
+            html += '<div class="prop-row" style="margin-top:6px">' +
+                '<input type="text" id="newColName" placeholder="název sloupce" style="width:55%"/> ' +
+                '<button type="button" class="btn btn-xs btn-default" id="addColBtn">Přidat</button></div>';
+            box.innerHTML = html;
+            box.querySelector("#addColBtn").addEventListener("click", function () {
+                var i = document.getElementById("newColName"); addColumn((i.value || "").trim()); i.value = "";
+            });
+            box.querySelectorAll("[data-cadd]").forEach(function (b) {
+                b.addEventListener("click", function () { addColumn(b.getAttribute("data-cadd")); });
+            });
+            box.querySelectorAll("[data-cren]").forEach(function (b) {
+                b.addEventListener("click", function () {
+                    var k = b.getAttribute("data-cren"), nn = prompt("Nový název sloupce:", k);
+                    if (nn && nn !== k) { renameColumn(k, nn); }
+                });
+            });
+            box.querySelectorAll("[data-cdel]").forEach(function (b) {
+                b.addEventListener("click", function () {
+                    var k = b.getAttribute("data-cdel");
+                    if (confirm('Odebrat sloupec "' + k + '" ze všech listů?')) { deleteColumn(k); }
+                });
+            });
+        }
+        function addColumn(k) {
+            if (!k) { return; }
+            pushHistory();
+            (geojson.features || []).forEach(function (f) {
+                var p = f.properties || (f.properties = {});
+                if (!(k in p)) { p[k] = ""; }
+            });
+            afterColumnChange();
+        }
+        function renameColumn(k, nn) {
+            pushHistory();
+            (geojson.features || []).forEach(function (f) {
+                var p = f.properties || {};
+                if (Object.prototype.hasOwnProperty.call(p, k)) { p[nn] = p[k]; delete p[k]; }
+            });
+            afterColumnChange();
+        }
+        function deleteColumn(k) {
+            pushHistory();
+            (geojson.features || []).forEach(function (f) { if (f.properties) { delete f.properties[k]; } });
+            afterColumnChange();
+        }
+        function afterColumnChange() {
+            renderColumns();
+            if (selectedFeature) { renderEditor(selectedFeature); }
         }
         // ---- property editor of selected sheet ----
         function renderEditor(feature) {
@@ -422,6 +496,7 @@ window.SheetMapEditor = (function () {
                     '</strong> listů. Přibliž ať se ukážou čísla. Klikni na list (rohy + rotace) nebo přidej souseda „+".</p>'
                 : '<p class="hint">Zatím žádné listy — vytvoř první obdélník, nebo vygeneruj mřížku.</p>';
             updateLabels();
+            renderColumns();
         }
 
         function updateLabels() {
@@ -540,6 +615,7 @@ window.SheetMapEditor = (function () {
                 loadGeojson((data && data.type) ? data : { type: "FeatureCollection", features: [] }, true);
             },
             hasFeatures: function () { return (geojson.features || []).length > 0; },
+            suggestColumns: function (list) { suggested = Array.isArray(list) ? list : []; renderColumns(); },
             invalidateSize: function () {
                 setTimeout(function () {
                     map.invalidateSize();

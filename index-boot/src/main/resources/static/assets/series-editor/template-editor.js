@@ -144,16 +144,18 @@ window.TemplateEditor = (function () {
                 "</tr></thead><tbody>" + rows + "</tbody></table>";
         }
 
+        function fireChange() { if (typeof opts.onChange === "function") { opts.onChange(); } }
         var timer = null;
         ta.addEventListener("input", function () {
             if (timer) { clearTimeout(timer); }
-            timer = setTimeout(render, 200);
+            timer = setTimeout(function () { render(); fireChange(); }, 200);
         });
         render();
+        fireChange();
 
         return {
             getText: function () { return ta.value; },
-            setText: function (t) { ta.value = t == null ? "" : t; render(); },
+            setText: function (t) { ta.value = t == null ? "" : t; render(); fireChange(); },
             isValid: function () { return scan(ta.value).bad < 0; }
         };
     }

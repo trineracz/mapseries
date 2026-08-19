@@ -40,6 +40,8 @@
         .prop-row { margin-bottom: 8px; }
         .prop-row label { display: block; font-size: 12px; color: #555; margin-bottom: 2px; }
         .prop-row input, .prop-row textarea { width: 100%; }
+        .col-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+        .col-row .cname { flex: 1 1 auto; font-family: monospace; font-size: 12px; }
         .sel { font-weight: bold; }
         .tool { border: 1px solid #ddd; background: #fafafa; padding: 10px; margin-bottom: 12px; }
         .tool input[type=number] { width: 64px; }
@@ -187,6 +189,7 @@
                                         <button type="button" id="undoBtn" class="btn btn-sm btn-default"><i class="fas fa-undo"></i> Zpět</button>
                                     </div>
                                 </div>
+                                <div id="colMgr" class="tool"></div>
                                 <div id="props"><p class="hint">Načítám mřížku…</p></div>
                             </div>
                         </div>
@@ -291,6 +294,15 @@
     var $ = function (sel) { return document.querySelector(sel); };
     var mapApi = null, tplApi = null;
 
+    // Tell the column manager which columns the template needs (its {"attr":"…"} keys),
+    // so it can offer to add the missing ones.
+    function updateSuggested() {
+        if (!mapApi || !tplApi) { return; }
+        var txt = tplApi.getText(), re = /"attr"\s*:\s*"([^"]+)"/g, m, set = {};
+        while ((m = re.exec(txt)) !== null) { set[m[1]] = true; }
+        mapApi.suggestColumns(Object.keys(set));
+    }
+
     // ---------- ① thumbnail live preview ----------
     var thumbUrl = document.getElementById("thumbUrl");
     var thumbImg = document.getElementById("thumbPreview");
@@ -307,7 +319,7 @@
     var gridSub = document.getElementById("gridSub");
     function initMap(cb) {
         if (mapApi) { mapApi.invalidateSize(); if (cb) { cb(); } return; }
-        var done = function (gj) { mapApi = SheetMapEditor.init({ initialGeojson: gj }); mapApi.invalidateSize(); if (cb) { cb(); } };
+        var done = function (gj) { mapApi = SheetMapEditor.init({ initialGeojson: gj }); mapApi.invalidateSize(); updateSuggested(); if (cb) { cb(); } };
         if (mode !== "new" && initialGrid) {
             fetch("/admin/series/sheets/data?grid=" + encodeURIComponent(initialGrid))
                 .then(function (r) { return r.ok ? r.json() : null; })
@@ -332,7 +344,7 @@
     var tplSection = document.getElementById("tplSection");
     function initTpl(cb) {
         if (tplApi) { if (cb) { cb(); } return; }
-        var done = function (txt) { tplApi = TemplateEditor.init({ initialText: txt || "" }); if (cb) { cb(); } };
+        var done = function (txt) { tplApi = TemplateEditor.init({ initialText: txt || "", onChange: updateSuggested }); if (cb) { cb(); } };
         if (mode !== "new" && initialGrid) {
             fetch("/admin/series/template/data?grid=" + encodeURIComponent(initialGrid))
                 .then(function (r) { return r.ok ? r.text() : ""; })
