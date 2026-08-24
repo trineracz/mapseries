@@ -145,24 +145,17 @@ window.TemplateEditor = (function () {
         }
 
         function fireChange() { if (typeof opts.onChange === "function") { opts.onChange(); } }
-        // Grow the textarea to fit its content (CSS caps it at max-height, then it scrolls).
-        function autosize() {
-            ta.style.height = "0px";
-            ta.style.height = ta.scrollHeight + "px";
-        }
         var timer = null;
         ta.addEventListener("input", function () {
-            autosize();
             if (timer) { clearTimeout(timer); }
             timer = setTimeout(function () { render(); fireChange(); }, 200);
         });
-        autosize();
         render();
         fireChange();
 
         return {
             getText: function () { return ta.value; },
-            setText: function (t) { ta.value = t == null ? "" : t; autosize(); render(); fireChange(); },
+            setText: function (t) { ta.value = t == null ? "" : t; render(); fireChange(); },
             isValid: function () { return scan(ta.value).bad < 0; }
         };
     }

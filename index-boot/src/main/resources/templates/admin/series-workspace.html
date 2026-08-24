@@ -58,23 +58,23 @@
         .movehandle { background: #3388ff; border: 2px solid #fff; border-radius: 50%; box-sizing: border-box; cursor: move; }
 
         /* template editor */
-        .tpl-layout { display: flex; gap: 16px; align-items: flex-start; }
+        .tpl-layout { display: flex; gap: 16px; align-items: stretch; }
         .tpl-col { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
         .tpl-col h5 { margin: 0 0 6px; }
-        /* backdrop + textarea share one grid cell; the textarea auto-grows with content */
-        .tpl-editor { display: grid; }
+        .tpl-editor { position: relative; height: 44vh; }
         #tplBackdrop, #tplText {
-            grid-area: 1 / 1 / 2 / 2; margin: 0; align-self: start;
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; margin: 0;
             font-family: monospace; font-size: 12px; line-height: 1.35; padding: 8px;
             border: 1px solid #ccc; box-sizing: border-box; white-space: pre; overflow: auto; }
-        #tplBackdrop { z-index: 1; background: #fff; color: transparent; pointer-events: none; max-height: 70vh; }
+        /* transparent border keeps the box metrics aligned with the textarea but draws
+           no visible line (a shorter opaque border used to strike through the text) */
+        #tplBackdrop { z-index: 1; background: #fff; color: transparent; pointer-events: none; border-color: transparent; }
         #tplBackdrop mark { background: #ffd0d0; color: transparent; }
-        #tplText { z-index: 2; background: transparent; color: #222; resize: none;
-            min-height: 140px; max-height: 70vh; overflow: auto; }
+        #tplText { z-index: 2; background: transparent; color: #222; resize: none; }
         #tplText.bad { border-color: #b23a2e; }
         #synMsg.ok { color: #2e7d32; }
         #synMsg.err { color: #b23a2e; }
-        .tpl-preview { max-height: 70vh; overflow-y: auto; border: 1px solid #ccc; padding: 8px; background: #fafafa; }
+        .tpl-preview { height: 44vh; overflow-y: auto; border: 1px solid #ccc; padding: 8px; background: #fafafa; }
         .tpl-preview table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .tpl-preview th, .tpl-preview td { border-bottom: 1px solid #e5e5e5; padding: 4px 6px; text-align: left; vertical-align: top; }
         .tpl-preview th { color: #555; font-weight: 600; }
