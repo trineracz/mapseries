@@ -11,7 +11,7 @@ set -e
 cd "$(dirname "$0")"
 docker run --rm --init --ipc=host \
   -v "$PWD":/work -w /work \
-  -e SHEETS_PER_SERIES -e ONLY_SERIES -e CATALOG_URL -e SCENARIOS -e WORKERS \
+  -e SHEETS_PER_SERIES -e ONLY_SERIES -e CATALOG_URL -e SCENARIOS -e WORKERS -e MAX_REPORT \
   mcr.microsoft.com/playwright:v1.48.2-jammy \
   bash -c "npm install --no-audit --no-fund --silent >/dev/null && \
     if [ '$1' = compare ]; then node compare.mjs out/$2 out/$3; else node parity.mjs $1 out/$2; fi"

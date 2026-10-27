@@ -187,19 +187,26 @@ ms.Template.prototype.createHtmlAndComboBoxes_ = function (template, series, map
   this.fields = [];
   var _this = this;
 
+  // where each JSON block sits (MARC field, tag) — in template order
+  var blocks = this.describeBlocks_(template);
+  var baseBlocks = goog.array.filter(blocks, function (b) { return b.base; });
+  var blockIdx = 0;
+
   //create BASE combo boxes
   var html = this.replaceEveryJson_(template, function (json, str) {
+    var block = blocks[blockIdx++];
     var baseId = json['base'];
     if (baseId) {
       return str;
     } else {
-      return _this.createComboBox_(json, series, map);
+      return _this.createComboBox_(json, series, map, block);
     }
   });
 
-  //create referring combo boxes
+  //create referring combo boxes (the base blocks left, in the same order)
+  blockIdx = 0;
   html = this.replaceEveryJson_(html, function (json, str) {
-    return _this.createComboBox_(json, series, map);
+    return _this.createComboBox_(json, series, map, baseBlocks[blockIdx++]);
   });
 
   html = '<pre>' + html + '</pre>';
@@ -258,10 +265,11 @@ $(document).ready(function () {
  * @param {Object} json config JSON.
  * @param {ms.Series} series series.
  * @param {OpenLayers.Map} map map.
+ * @param {Object=} block where the JSON block sits (see describeBlocks_).
  * @return {string} combobox HTML.
  * @private
  */
-ms.Template.prototype.createComboBox_ = function (json, series, map) {
+ms.Template.prototype.createComboBox_ = function (json, series, map, block) {
   var baseId = json['base'];
 
   if (baseId) {
@@ -280,11 +288,13 @@ ms.Template.prototype.createComboBox_ = function (json, series, map) {
   var cb = new ms.ComboBox();
   cb.configurate(json, series, map);
   cb.base = base || null;
+  cb.fieldIdx = block ? block.field : -1;
+  cb.editable = !!(cb.base && cb.valuesByBaseIndex && block && block.editable);
 
   this.fields.push(cb);
 
   var cls = ['combo'];
-  if (base || cb.configObj['enabled'] === false) {
+  if ((base && !cb.editable) || cb.configObj['enabled'] === false) {
     cls.push('disabled');
   }
   cls = cls.join(' ');
@@ -415,8 +425,25 @@ ms.Template.prototype.initComboBoxes_ = function (sheet, series, map) {
       }, false, this);
     }
 
+    // an editable linked field: choosing one of its values switches the other
+    // linked fields of the same MARC field (e.g. the 710 indicator) to match
+    if (cb.editable) {
+      goog.events.listen(cb, 'change', function (evt) {
+        var index = cb.baseIndexOfValue(cb.getValue(), sheet);
+        if (index < 0) {
+          return;
+        }
+        goog.array.forEach(this.fields, function (other) {
+          if (other !== cb && other.base === cb.base && !other.editable &&
+              other.fieldIdx === cb.fieldIdx && other.valuesByBaseIndex) {
+            other.getInputElement().value = other.valueForBaseIndex(index, sheet);
+          }
+        });
+      }, false, this);
+    }
+
     //visual styles
-    if (cb.base || cb.configObj['enabled'] === false) {
+    if ((cb.base && !cb.editable) || cb.configObj['enabled'] === false) {
       cb.setEnabled(false);
     } else {
       goog.events.listen(cb.getInputElement(), 'focus', function (evt) {
@@ -468,7 +495,12 @@ ms.Template.prototype.initComboBoxes_ = function (sheet, series, map) {
  * @private
  */
 ms.Template.prototype.addOptions_ = function (cb, sheet) {
-  if (!cb.base && (cb.values || cb.value)) {
+  if (cb.editable) {
+    // all values the template has for this linked field (prefilled from the base)
+    goog.array.forEach(cb.getBaseOptions(sheet), function (option) {
+      cb.addItem(new goog.ui.ComboBoxItem(option));
+    });
+  } else if (!cb.base && (cb.values || cb.value)) {
     var values = cb.values || [cb.value];
 
     //create options
@@ -556,6 +588,55 @@ ms.Template.prototype.getDependent_ = function (mainCb) {
 
 
 /**
+ * Fields linked to a base that stay editable by default: the subfields of the
+ * added entries (710) and the statement of responsibility (245 $c) — catalogers
+ * need to adjust them per sheet. Indicators stay locked and follow the chosen
+ * value. A template can override it with "editable": true/false.
+ * @type {Array.<string>}
+ * @private
+ */
+ms.Template.EDITABLE_LINKED_TAGS_ = ['245', '710'];
+
+
+/**
+ * Describe every JSON block of the template, in template order: whether it is
+ * linked to a base, the MARC field (line) it belongs to and its tag, and
+ * whether it is editable.
+ * @param {string} template template string.
+ * @return {Array.<{base: boolean, field: number, tag: string, editable: boolean}>}
+ * @private
+ */
+ms.Template.prototype.describeBlocks_ = function (template) {
+  var found = [];
+  this.replaceEveryJson_(template, function (json, str, start) {
+    found.push({ json: json, start: start, end: start + str.length });
+    return str;
+  });
+  // a MARC field starts at the beginning of a line that is not inside a block
+  var fieldStarts = [];
+  for (var p = 0; p < template.length; p = template.indexOf('\n', p) + 1 || template.length) {
+    var inBlock = goog.array.find(found, function (b) { return p > b.start && p < b.end; });
+    if (!inBlock) {
+      fieldStarts.push(p);
+    }
+  }
+  return goog.array.map(found, function (b) {
+    var field = -1;
+    for (var i = 0; i < fieldStarts.length && fieldStarts[i] <= b.start; i++) {
+      field = i;
+    }
+    var tag = field >= 0 ? template.substr(fieldStarts[field], 3) : '';
+    var base = !!b.json['base'];
+    // only subfield values ($$...), never indicators, are editable by default
+    var inSubfield = field >= 0 && template.substring(fieldStarts[field], b.start).indexOf('$$') >= 0;
+    var editable = goog.isDef(b.json['editable']) ? !!b.json['editable'] :
+      inSubfield && goog.array.indexOf(ms.Template.EDITABLE_LINKED_TAGS_, tag) >= 0;
+    return { base: base, field: field, tag: tag, editable: base && editable };
+  });
+};
+
+
+/**
  * Go through template and replace every JSON with result of given function
  * applied to this JSON.
  * @param {string} template template string.
@@ -614,7 +695,7 @@ ms.Template.prototype.replaceEveryJson_ = function (template, f) {
       }
     }
     if (json) {
-      replacements.push([ob, cb + 1, f(json, str)]);
+      replacements.push([ob, cb + 1, f(json, str, ob)]);
     }
     closeBracket = cb;
   }

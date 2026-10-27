@@ -16,7 +16,7 @@ const normDom = (s) => s && s.replace(/ id="(:[0-9a-z]+|goog_[0-9]+)"/g, '')
 
 let problems = 0;
 let checked = 0;
-const report = (msg) => { problems++; if (problems <= 60) console.log(msg); };
+const report = (msg) => { problems++; if (problems <= (Number(process.env.MAX_REPORT) || 60)) console.log(msg); };
 
 const candSeries = new Map(cand.series.map((s) => [s.layer, s]));
 for (const os of oracle.series) {

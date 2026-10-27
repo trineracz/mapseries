@@ -1373,10 +1373,10 @@ class ComboBoxImpl extends Component_ {
     h.listen(document, 'mousedown', this.onDocClicked_);
     h.listen(this.input_, 'blur', this.onInputBlur_);
     // Closure fed this from goog.events.KeyHandler, which in today's browsers
-    // only ever delivered keys that fire 'keypress' (Enter and characters):
-    // arrows, Tab, Home/End and Esc never reached the combobox. Listening to
-    // 'keypress' keeps that exact behaviour (the catalog must not change).
-    h.listen(this.input_, 'keypress', this.handleKeyEvent);
+    // only delivered keys that fire 'keypress' (Enter and characters), so the
+    // arrows, Home/End never worked. They do now (keydown); Tab keeps moving to
+    // the next field as before (see handleKeyEvent).
+    h.listen(this.input_, 'keydown', this.handleKeyEvent);
     h.listen(this.input_, 'input', this.onInputEvent_);
     this.menu_.listen('action', this.onMenuSelected_, this);
   }
@@ -1539,15 +1539,8 @@ class ComboBoxImpl extends Component_ {
           handled = true;
         }
         break;
-      case K.TAB:
-        if (isMenuVisible) {
-          const highlighted = this.menu_.getHighlighted();
-          if (highlighted) {
-            highlighted.performActionInternal(e);
-            handled = true;
-          }
-        }
-        break;
+      // K.TAB: Closure would pick the highlighted item (even the disabled
+      // "type a value" hint); it never did in practice, so Tab is left alone.
       case K.UP:
       case K.DOWN:
         if (!isMenuVisible) {
