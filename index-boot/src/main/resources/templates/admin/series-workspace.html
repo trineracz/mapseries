@@ -10,8 +10,13 @@
     <link rel="stylesheet" type="text/css" th:href="@{/assets/vendor/leaflet/leaflet.css}"/>
     <script type="text/javascript" th:src="@{/assets/main.js}"></script>
     <script type="text/javascript" th:src="@{/assets/vendor/leaflet/leaflet.js}"></script>
-    <script type="text/javascript" th:src="@{/assets/series-editor/sheet-map-editor.js}"></script>
-    <script type="text/javascript" th:src="@{/assets/series-editor/template-editor.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/vendor/togeojson/togeojson.umd.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/vendor/topojson/topojson-client.min.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/vendor/proj4/proj4.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/geo-import.js(v=4)}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/geo-export.js(v=4)}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/sheet-map-editor.js(v=4)}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/template-editor.js(v=4)}"></script>
     <style>
         .ws-card { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 14px; background: #fff; }
         .ws-card > summary { cursor: pointer; font-weight: bold; font-size: 15px; padding: 12px 14px;
@@ -33,11 +38,18 @@
 
         /* sheet map editor */
         .sheets-layout { display: flex; gap: 16px; align-items: stretch; }
-        .sheets-map { flex: 1 1 auto; }
+        .sheets-map { flex: 1 1 auto; position: relative; }
+        .sheets-map.dragover::after { content: "Pusť soubor pro nahrání mřížky"; position: absolute; inset: 0;
+            z-index: 1200; display: flex; align-items: center; justify-content: center;
+            background: rgba(51,136,255,0.12); border: 3px dashed #3388ff; color: #24518c; font-weight: 700;
+            pointer-events: none; }
         #map { height: 62vh; border: 1px solid #ccc; }
         .sheets-side { flex: 0 0 360px; max-height: 62vh; overflow-y: auto; border: 1px solid #ccc; padding: 12px; }
         .sheets-side .hint { color: #888; font-size: 13px; }
         .prop-row { margin-bottom: 8px; }
+        /* selected-sheet detail below the map: lay attributes out in responsive columns */
+        #selCard .attr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 14px; }
+        #selCard #coordBox { margin-top: 8px; max-width: 560px; }
         .prop-row label { display: block; font-size: 12px; color: #555; margin-bottom: 2px; }
         .prop-row input, .prop-row textarea { width: 100%; }
         .col-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
@@ -86,6 +98,24 @@
         .hint { color: #888; font-size: 13px; }
         .hint.ok { color: #2e7d32; }
         .hint.err { color: #b23a2e; }
+
+        /* bulk sheet table */
+        .sheet-table-wrap { max-height: 50vh; overflow: auto; border: 1px solid #ddd; }
+        table.sheet-table { border-collapse: collapse; font-size: 12px; width: 100%; }
+        table.sheet-table th, table.sheet-table td { border: 1px solid #e5e5e5; padding: 2px 4px; }
+        table.sheet-table thead th { position: sticky; top: 0; background: #f6f7f9; z-index: 1; text-align: left; }
+        table.sheet-table th .cbar { display: flex; gap: 4px; align-items: center; }
+        table.sheet-table th .cbar .cn { font-family: monospace; }
+        table.sheet-table td input { width: 100%; border: 1px solid transparent; background: transparent; font-size: 12px; padding: 1px 2px; }
+        table.sheet-table td input:focus { border-color: #3388ff; background: #fff; }
+        table.sheet-table td.sheet-cell { white-space: nowrap; }
+        table.sheet-table th.loc-col, table.sheet-table td.loc-cell { width: 26px; padding: 0; text-align: center; }
+        table.sheet-table a.rowsel { display: inline-block; width: 100%; padding: 3px 0; cursor: pointer;
+            text-decoration: none; color: #3388ff; }
+        table.sheet-table a.rowsel:hover { background: #e8eefc; color: #24518c; }
+        table.sheet-table .colbtn { border: none; background: #e8eefc; color: #24518c; border-radius: 3px; font-size: 10px; padding: 0 4px; cursor: pointer; }
+        table.sheet-table tr.sel-row td { background: #dce8ff; }
+        table.sheet-table tr.row-flash td { background: #fff3cd; transition: background .3s ease; }
 
         .gb-opt { display: block; margin: 4px 0; }
         .gb-ex { color: #888; font-family: monospace; font-size: 12px; margin-left: 8px; }
@@ -171,15 +201,25 @@
                     <summary><span class="ws-num">2</span> Mřížka listů <span class="sub" id="gridSub">— nakresli na mapě nebo nahraj geojson</span></summary>
                     <div class="ws-body">
                         <div class="upload-row">
-                            <label>Nahrát geojson (nepovinné): </label>
-                            <input type="file" id="gridUpload" accept=".json,.geojson,application/json"/>
-                            <span class="help" style="display:inline">— nahraný soubor se hned vykreslí na mapě a jde upravit</span>
+                            <label>Nahrát mřížku (nepovinné): </label>
+                            <input type="file" id="gridUpload"/>
+                            <span class="help" style="display:inline">— GeoJSON, TopoJSON, KML, GPX nebo CSV; hned se vykreslí na mapě a jde upravit</span>
+                            <span style="margin-left:14px">
+                                <label>Stáhnout jako: </label>
+                                <select id="exportFormat"></select>
+                                <button type="button" id="exportBtn" class="btn btn-sm btn-default"><i class="fas fa-download"></i> Stáhnout</button>
+                            </span>
                         </div>
                         <div class="sheets-layout">
                             <div class="sheets-map"><div id="map"></div></div>
                             <div class="sheets-side" id="side">
+                                <div class="hint" style="margin-bottom:8px">Práce s celou mřížkou. Jednotlivý list uprav kliknutím na mapě — otevře se detail pod mapou.</div>
+                                <div class="prop-row" style="margin-bottom:10px">
+                                    <button type="button" id="gotoDetail" class="btn btn-sm btn-default" disabled>Detail vybraného listu ↓</button>
+                                    <span id="selInfo" class="hint"></span>
+                                </div>
                                 <div class="tool">
-                                    <strong>Vytvořit listy</strong>
+                                    <strong>Přidat listy</strong>
                                     <div class="prop-row" style="margin-top:6px">
                                         <button type="button" id="pickBtn" class="btn btn-sm btn-primary">Vybrat oblast na mapě</button>
                                         <label>Ř</label><input type="number" id="rows" min="1" value="1"/>
@@ -192,13 +232,41 @@
                                     </div>
                                 </div>
                                 <div id="colMgr" class="tool"></div>
-                                <div id="props"><p class="hint">Načítám mřížku…</p></div>
                             </div>
                         </div>
                         <p class="hint" style="margin-top:8px">
                             Klik na list = úprava (rohy táhni pro velikost, zelený úchyt nahoře pro <strong>rotaci</strong>;
                             Shift/Ctrl = rotace po 15°). Najetí myší nabídne prázdné sousedy „+". Ctrl/Cmd+Z = zpět.
                         </p>
+                        <div class="ws-card" id="selCard" style="margin-top:10px">
+                            <div class="ws-body" style="padding:12px 14px">
+                                <strong>Vybraný list</strong>
+                                <div id="props"><p class="hint">Klikni na list na mapě — jeho údaje, souřadnice a rotace se ukážou tady a půjdou upravit.</p></div>
+                            </div>
+                        </div>
+                        <details class="ws-card" id="tableSection" style="margin-top:10px">
+                            <summary style="padding:8px 10px">Tabulka všech listů <span class="sub">— hromadná úprava atributů</span></summary>
+                            <div class="ws-body" style="padding-top:8px">
+                                <div class="hint" style="margin-bottom:6px">Uprav hodnoty přímo v tabulce. Klik na číslo listu ho vybere i na mapě. V hlavičce sloupce lze hodnotu hromadně vyplnit/vymazat.</div>
+                                <div style="margin-bottom:6px">
+                                    <button type="button" id="tableFindBtn" class="btn btn-sm btn-default" disabled><i class="fas fa-crosshairs"></i> Najít vybraný list</button>
+                                    <span class="hint">— posune tabulku na list, který máš vybraný na mapě</span>
+                                </div>
+                                <div id="sheetTableWrap" class="sheet-table-wrap"></div>
+                            </div>
+                        </details>
+                        <details class="ws-card" id="rawSection" style="margin-top:10px">
+                            <summary style="padding:8px 10px">Pokročilé: upravit GeoJSON jako text <span class="sub">— pro ruční/hromadné zásahy</span></summary>
+                            <div class="ws-body" style="padding-top:8px">
+                                <div class="hint" style="margin-bottom:6px">Načte aktuální mřížku jako text. Po úpravě klikni „Použít do mapy" — proběhne validace a mapa se překreslí. <strong>Načíst z mapy</strong> vezme aktuální stav zpět do textu.</div>
+                                <div style="margin-bottom:6px">
+                                    <button type="button" id="rawReload" class="btn btn-sm btn-default">Načíst z mapy</button>
+                                    <button type="button" id="rawApply" class="btn btn-sm btn-primary">Použít do mapy</button>
+                                    <span id="rawMsg" class="hint"></span>
+                                </div>
+                                <textarea id="rawText" spellcheck="false" style="width:100%;height:36vh;font-family:monospace;font-size:12px"></textarea>
+                            </div>
+                        </details>
                     </div>
                 </details>
 
@@ -321,7 +389,7 @@
     var gridSub = document.getElementById("gridSub");
     function initMap(cb) {
         if (mapApi) { mapApi.invalidateSize(); if (cb) { cb(); } return; }
-        var done = function (gj) { mapApi = SheetMapEditor.init({ initialGeojson: gj }); mapApi.invalidateSize(); updateSuggested(); if (cb) { cb(); } };
+        var done = function (gj) { mapApi = SheetMapEditor.init({ initialGeojson: gj, onSelect: onSheetSelect }); mapApi.invalidateSize(); updateSuggested(); if (cb) { cb(); } };
         if (mode !== "new" && initialGrid) {
             fetch("/admin/series/sheets/data?grid=" + encodeURIComponent(initialGrid))
                 .then(function (r) { return r.ok ? r.json() : null; })
@@ -329,17 +397,125 @@
                 .catch(function () { done(null); });
         } else { done(null); }
     }
+    // like initMap, but when the map already exists don't invalidateSize/fit — used by
+    // the table & raw sections (nested under the already-open map section) so opening
+    // them never jolts the map view or reloads tiles.
+    function ensureEditor(cb) { if (mapApi) { if (cb) { cb(); } return; } initMap(cb); }
+    // selecting a sheet on the map enables the jump buttons (no auto-scroll)
+    var gotoDetail = document.getElementById("gotoDetail"), selInfo = document.getElementById("selInfo");
+    var tableFindBtn = document.getElementById("tableFindBtn");
+    function onSheetSelect(feature) {
+        var has = !!feature;
+        gotoDetail.disabled = !has;
+        tableFindBtn.disabled = !has;
+        selInfo.textContent = has ? "vybrán list " + ((feature.properties || {}).SHEET || (feature.properties || {}).TITLE || "—") : "";
+    }
+    gotoDetail.addEventListener("click", function () {
+        var card = document.getElementById("selCard");
+        if (card && card.scrollIntoView) { card.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    });
+
     gridSection.addEventListener("toggle", function () { if (gridSection.open) { initMap(); } });
-    document.getElementById("gridUpload").addEventListener("change", function (e) {
-        var file = e.target.files[0]; if (!file) { return; }
+    // Read a dropped/picked file, convert via GeoImport, draw it on the map.
+    function loadGridFile(file) {
+        if (!file) { return; }
         var reader = new FileReader();
         reader.onload = function () {
             var gj;
-            try { gj = JSON.parse(reader.result); } catch (err) { alert("Neplatný geojson: " + err.message); return; }
+            try { gj = GeoImport.parse(file.name, reader.result); }
+            catch (err) { alert("Nešlo načíst soubor: " + err.message); return; }
             if (!gridSection.open) { gridSection.open = true; }
             initMap(function () { mapApi.setGeojson(gj); });
         };
         reader.readAsText(file);
+    }
+    var gridUpload = document.getElementById("gridUpload");
+    if (window.GeoImport) { gridUpload.setAttribute("accept", GeoImport.ACCEPT); }
+    gridUpload.addEventListener("change", function (e) {
+        loadGridFile(e.target.files[0]);
+        e.target.value = "";   // allow re-uploading the same file
+    });
+
+    // drag & drop a file anywhere on the map area
+    var dropZone = document.querySelector(".sheets-map");
+    if (dropZone) {
+        ["dragenter", "dragover"].forEach(function (ev) {
+            dropZone.addEventListener(ev, function (e) {
+                if (e.dataTransfer) { e.dataTransfer.dropEffect = "copy"; }
+                e.preventDefault(); e.stopPropagation(); dropZone.classList.add("dragover");
+            });
+        });
+        ["dragleave", "dragend"].forEach(function (ev) {
+            dropZone.addEventListener(ev, function (e) {
+                e.preventDefault(); e.stopPropagation();
+                if (ev === "dragleave" && dropZone.contains(e.relatedTarget)) { return; }
+                dropZone.classList.remove("dragover");
+            });
+        });
+        dropZone.addEventListener("drop", function (e) {
+            e.preventDefault(); e.stopPropagation(); dropZone.classList.remove("dragover");
+            loadGridFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+        });
+    }
+
+    // ---------- ② grid: export / download ----------
+    var exportSel = document.getElementById("exportFormat");
+    if (window.GeoExport && exportSel) {
+        GeoExport.FORMATS.forEach(function (f) {
+            var o = document.createElement("option"); o.value = f.key; o.textContent = f.label; exportSel.appendChild(o);
+        });
+    }
+    document.getElementById("exportBtn").addEventListener("click", function () {
+        if (!mapApi || !mapApi.hasFeatures()) { alert("Mřížka je prázdná — není co stáhnout."); return; }
+        var name = (gridInput && gridInput.value ? gridInput.value : "grid").trim() || "grid";
+        try { GeoExport.download(exportSel.value, mapApi.getGeojson(), name); }
+        catch (err) { alert("Export selhal: " + err.message); }
+    });
+
+    // ---------- ② grid: bulk table view ----------
+    var tableSection = document.getElementById("tableSection");
+    var tableMounted = false;
+    function ensureTableMounted(cb) {
+        ensureEditor(function () {
+            if (!tableMounted) { mapApi.mountTable(document.getElementById("sheetTableWrap")); tableMounted = true; }
+            if (cb) { cb(); }
+        });
+    }
+    tableSection.addEventListener("toggle", function () { if (tableSection.open) { ensureTableMounted(); } });
+    tableFindBtn.addEventListener("click", function () {
+        if (!mapApi || !mapApi.hasSelected()) { alert("Nejdřív klikni na list na mapě."); return; }
+        if (!tableSection.open) { tableSection.open = true; }
+        ensureTableMounted(function () {
+            tableSection.scrollIntoView({ behavior: "smooth", block: "start" });
+            // let the section scroll settle, then bring the selected row into view + flash it
+            setTimeout(function () { mapApi.scrollToSelectedRow(); }, 350);
+        });
+    });
+
+    // ---------- ② grid: raw GeoJSON text editor ----------
+    var rawSection = document.getElementById("rawSection");
+    var rawText = document.getElementById("rawText"), rawMsg = document.getElementById("rawMsg");
+    function rawLoadFromMap() {
+        rawMsg.className = "hint"; rawMsg.textContent = "";
+        var gj = mapApi ? mapApi.getGeojson() : { type: "FeatureCollection", features: [] };
+        rawText.value = JSON.stringify(gj, function (k, v) { return k === "_template" ? undefined : v; }, 2);
+    }
+    rawSection.addEventListener("toggle", function () {
+        if (!rawSection.open) { return; }
+        ensureEditor(function () { rawLoadFromMap(); });
+    });
+    document.getElementById("rawReload").addEventListener("click", rawLoadFromMap);
+    document.getElementById("rawApply").addEventListener("click", function () {
+        var gj;
+        try { gj = JSON.parse(rawText.value); }
+        catch (err) { rawMsg.className = "hint err"; rawMsg.textContent = "✕ Neplatný JSON: " + err.message; return; }
+        if (!gj || gj.type !== "FeatureCollection" || !Array.isArray(gj.features)) {
+            rawMsg.className = "hint err"; rawMsg.textContent = "✕ Musí to být GeoJSON FeatureCollection (type + features[])."; return;
+        }
+        ensureEditor(function () {
+            mapApi.setGeojson(gj);
+            rawMsg.className = "hint ok"; rawMsg.textContent = "✔ Použito — mřížka má " + gj.features.length + " listů.";
+        });
     });
 
     // ---------- ③ template: lazy-init on first open ----------
@@ -447,8 +623,15 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
             if (res.success) {
-                msg.textContent = "✔ " + res.message; msg.style.color = "#2e7d32";
-                if (res.redirect) { setTimeout(function () { location.href = res.redirect; }, 700); }
+                msg.style.color = "#2e7d32";
+                if (res.prUrl) {
+                    msg.innerHTML = "✔ " + res.message.replace(/</g, "&lt;") +
+                        ' <a href="' + res.prUrl + '" target="_blank" rel="noopener">otevřít návrh změny ↗</a>';
+                    // PR opened — let the user see/click the link instead of whisking them away
+                } else {
+                    msg.textContent = "✔ " + res.message;
+                    if (res.redirect) { setTimeout(function () { location.href = res.redirect; }, 700); }
+                }
             } else { fail(res.message); }
         })
         .catch(function (e) { fail(e.message); });

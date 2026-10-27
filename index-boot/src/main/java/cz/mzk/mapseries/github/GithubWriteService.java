@@ -12,9 +12,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
- * Commits a single file to the WRITE repo (our fork) via the GitHub git-data
- * REST API. Replaces the egit-based half of the old GithubService.saveFile;
- * writes never touch the production read repo.
+ * Commits changes to the WRITE repo (our fork) via the GitHub git-data REST API
+ * and opens a Pull Request against the READ repo (upstream) — nothing lands on
+ * the production data without review, exactly like the old editor's fork → work
+ * branch → pull-request flow. Writes never patch a shared master directly.
  */
 @Component
 public class GithubWriteService {
@@ -28,25 +29,39 @@ public class GithubWriteService {
         this.props = props;
     }
 
-    /** Commit a single file (convenience wrapper around {@link #saveFiles}). */
-    public void saveFile(String token, String commitMessage, String path, String content) {
-        saveFiles(token, commitMessage, java.util.Map.of(path, content));
+    /** Outcome of a save: the branch that was pushed and the PR opened for it.
+     *  In dry-run everything is null / -1 (nothing was written). */
+    public record SaveResult(String branch, String prUrl, int prNumber) {
+        public boolean committed() { return branch != null; }
     }
 
-    /** Commit several files to the WRITE repo's master branch in ONE commit. */
-    public void saveFiles(String token, String commitMessage, java.util.Map<String, String> files) {
-        String repo = props.repo().writeUser() + "/" + props.repo().writeName();
+    /** Commit a single file (convenience wrapper around {@link #saveFiles}). */
+    public SaveResult saveFile(String token, String commitMessage, String path, String content) {
+        return saveFiles(token, commitMessage, java.util.Map.of(path, content));
+    }
+
+    /** Commit the given files to a fresh branch in the WRITE repo (ONE commit) and
+     *  open a Pull Request into the READ repo's master. When read == write this is
+     *  an internal PR; when they differ (a fork) it's a cross-fork PR to upstream. */
+    public SaveResult saveFiles(String token, String commitMessage, java.util.Map<String, String> files) {
+        String writeRepo = props.repo().writeUser() + "/" + props.repo().writeName();
+        String baseRepo = props.repo().readUser() + "/" + props.repo().readName();
         if (props.editor() != null && props.editor().dryRun()) {
-            log.warn("saveFiles: DRY-RUN — skipping commit of {} file(s) to {}: {}",
-                    files.size(), repo, files.keySet());
-            return;
+            log.warn("saveFiles: DRY-RUN — skipping commit of {} file(s) to {} + PR to {}: {}",
+                    files.size(), writeRepo, baseRepo, files.keySet());
+            return new SaveResult(null, null, -1);
         }
-        String api = "https://api.github.com/repos/" + repo;
-        log.info("saveFiles: committing {} file(s) to {} (token present={}, msg='{}')",
-                files.size(), repo, token != null && !token.isBlank(), commitMessage);
+        String api = "https://api.github.com/repos/" + writeRepo;
+        String branch = branchName(commitMessage);
+        log.info("saveFiles: committing {} file(s) to {}@{} (token present={}, msg='{}')",
+                files.size(), writeRepo, branch, token != null && !token.isBlank(), commitMessage);
         try {
             String masterSha = get(api + "/git/refs/heads/master", token)
                     .getJSONObject("object").getString("sha");
+
+            // branch off the write repo's current master
+            post(api + "/git/refs", token, new JSONObject()
+                    .put("ref", "refs/heads/" + branch).put("sha", masterSha));
 
             String baseTreeSha = get(api + "/git/commits/" + masterSha, token)
                     .getJSONObject("tree").getString("sha");
@@ -66,14 +81,31 @@ public class GithubWriteService {
                     .put("tree", newTreeSha)
                     .put("parents", new JSONArray().put(masterSha))).getString("sha");
 
-            patch(api + "/git/refs/heads/master", token, new JSONObject().put("sha", newCommitSha));
-            log.info("saveFiles: committed {} to {}@master", newCommitSha, repo);
+            patch(api + "/git/refs/heads/" + branch, token, new JSONObject().put("sha", newCommitSha));
+            log.info("saveFiles: committed {} to {}@{}", newCommitSha, writeRepo, branch);
+
+            // open the PR upstream: head = <writeUser>:<branch>, base = master
+            String head = props.repo().writeUser() + ":" + branch;
+            JSONObject pr = post("https://api.github.com/repos/" + baseRepo + "/pulls", token,
+                    new JSONObject().put("title", commitMessage).put("base", "master")
+                            .put("head", head).put("body", "Vytvořeno editorem sérií (Mapseries admin)."));
+            log.info("saveFiles: opened PR {} on {}", pr.optString("html_url", "?"), baseRepo);
+            return new SaveResult(branch, pr.optString("html_url", null), pr.optInt("number", -1));
         } catch (RestClientResponseException e) {
-            log.error("saveFiles: GitHub API {} for {} -> {}", e.getStatusCode(), repo,
+            log.error("saveFiles: GitHub API {} for {} -> {}", e.getStatusCode(), writeRepo,
                     e.getResponseBodyAsString());
             throw new RuntimeException("GitHub API " + e.getStatusCode() + ": "
                     + e.getResponseBodyAsString(), e);
         }
+    }
+
+    /** A branch name safe for git refs: edit-<slug>-<timestamp>. */
+    private static String branchName(String commitMessage) {
+        String slug = commitMessage == null ? "" : commitMessage.toLowerCase()
+                .replaceAll("[^a-z0-9]+", "-").replaceAll("(^-+|-+$)", "");
+        if (slug.length() > 40) { slug = slug.substring(0, 40).replaceAll("-+$", ""); }
+        if (slug.isBlank()) { slug = "series"; }
+        return "edit-" + slug + "-" + System.currentTimeMillis();
     }
 
     private JSONObject get(String url, String token) {

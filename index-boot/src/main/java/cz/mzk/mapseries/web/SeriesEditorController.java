@@ -163,14 +163,23 @@ public class SeriesEditorController {
         if (req.geojson() != null) { files.put("geojson/" + grid + ".json", req.geojson()); }
         if (hasTemplate) { files.put("template/" + grid + ".txt", req.template()); }
 
+        GithubWriteService.SaveResult result;
         try {
             String msg = ("edit".equals(mode) ? "Edit series: " : "Create series: ") + prettyName(name);
-            githubWriteService.saveFiles(authService.getToken(), msg, files);
+            result = githubWriteService.saveFiles(authService.getToken(), msg, files);
         } catch (Exception e) {
             return Map.of("success", false, "message", "Uložení na GitHub selhalo: " + e.getMessage());
         }
-        return Map.of("success", true, "redirect", "/admin/series",
-                "message", dryRun() ? "Uloženo (testovací režim — necommitnuto)." : "Uloženo.");
+        String message = dryRun() || !result.committed()
+                ? "Uloženo (testovací režim — nevytvořen návrh změny)."
+                : "Vytvořen návrh změny (PR" + (result.prNumber() > 0 ? " #" + result.prNumber() : "")
+                        + ") — čeká na schválení správcem.";
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("success", true);
+        out.put("redirect", "/admin/series");
+        out.put("message", message);
+        if (result.prUrl() != null) { out.put("prUrl", result.prUrl()); }
+        return out;
     }
 
     public record SaveRequest(String mode, String originalName, String name, String descCs, String descEn,
@@ -190,9 +199,11 @@ public class SeriesEditorController {
         if (idx >= 0) {
             items.remove(idx);
             try {
-                githubWriteService.saveFile(authService.getToken(),
+                GithubWriteService.SaveResult result = githubWriteService.saveFile(authService.getToken(),
                         "Delete series: " + prettyName(name), CONTENT_DEFINITION_PATH, serialize(items));
-                flash.addFlashAttribute("saved", prettyName(name) + " — smazáno");
+                flash.addFlashAttribute("saved", result.committed()
+                        ? prettyName(name) + " — vytvořen návrh změny (PR" + (result.prNumber() > 0 ? " #" + result.prNumber() : "") + ")"
+                        : prettyName(name) + " — smazáno (testovací režim)");
             } catch (Exception e) {
                 flash.addFlashAttribute("saveError", "Smazání selhalo: " + e.getMessage());
             }

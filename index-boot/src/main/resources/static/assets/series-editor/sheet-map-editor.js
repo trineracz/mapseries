@@ -17,11 +17,24 @@ window.SheetMapEditor = (function () {
         opts = opts || {};
 
         var props = document.getElementById("props");
+        var onSelect = opts.onSelect;   // page hook: notified with the selected feature (or null)
+        function notifySelect(f) { if (typeof onSelect === "function") { try { onSelect(f); } catch (e) { /* ignore */ } } }
 
         var map = L.map("map", { preferCanvas: true });
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        // Keyless base layers only — no API tokens, so nothing breaks in deployment.
+        var osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 19, attribution: "© OpenStreetMap"
         }).addTo(map);
+        var topo = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+            maxZoom: 17, attribution: "© OpenTopoMap (CC-BY-SA), © OpenStreetMap"
+        });
+        var imagery = L.tileLayer(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+            maxZoom: 19, attribution: "Letecký snímek © Esri, Maxar, Earthstar Geographics"
+        });
+        L.control.layers({
+            "Mapa (OSM)": osm, "Turistická (OpenTopoMap)": topo, "Letecký snímek (Esri)": imagery
+        }, null, { collapsed: false }).addTo(map);
         map.setView([49.8, 15.5], 6);
         map.on("moveend", updateLabels);
 
@@ -43,6 +56,27 @@ window.SheetMapEditor = (function () {
         var moveIcon = L.divIcon({ className: "movehandle", iconSize: [16, 16] });
         var plusIcon = L.divIcon({ className: "ghost-plus", html: "+", iconSize: [22, 22] });
         var LABEL_SPACING = 34, LABEL_CAP = 500;
+
+        // ---- coordinate system for the selected-sheet corner boxes ----
+        // WGS84 by default; optionally read/enter corners in S-JTSK / Křovák.
+        if (window.proj4) {
+            try {
+                proj4.defs("EPSG:5514", "+proj=krovak +lat_0=49.5 +lon_0=24.8333333333333 " +
+                    "+alpha=30.2881397527778 +k=0.9999 +x_0=0 +y_0=0 +ellps=bessel " +
+                    "+towgs84=589,76,480,0,0,0,0 +units=m +no_defs +type=crs");
+            } catch (e) { /* already defined */ }
+        }
+        var coordCrs = "EPSG:4326";
+        // A latitude/longitude → the two numbers shown for the current CRS, and back.
+        // WGS84: [lat, lng] (keeps the familiar order). Projected: [X (east), Y (north)].
+        function llToDisplay(latlng) {
+            if (coordCrs === "EPSG:4326" || !window.proj4) { return [latlng.lat, latlng.lng]; }
+            var xy = proj4("EPSG:4326", coordCrs, [latlng.lng, latlng.lat]); return [xy[0], xy[1]];
+        }
+        function displayToLL(d1, d2) {
+            if (coordCrs === "EPSG:4326" || !window.proj4) { return L.latLng(d1, d2); }
+            var ll = proj4(coordCrs, "EPSG:4326", [d1, d2]); return L.latLng(ll[1], ll[0]);
+        }
 
         function esc(s) {
             return String(s).replace(/[&<>"']/g, function (c) {
@@ -156,10 +190,10 @@ window.SheetMapEditor = (function () {
             if (!box) { return; }
             var keys = fieldKeys(), has = {};
             keys.forEach(function (k) { has[k] = true; });
-            var html = '<strong>Sloupce listů</strong>' +
-                '<div class="hint">Katalogizační pole, která má každý list. Šablona je tahá přes <code>attr</code> (např. N245A).</div>';
+            var html = '<strong>Atributy listů</strong>' +
+                '<div class="hint">Údaje, které nese každý list (např. TITLE, autor). Šablona je tahá přes <code>attr</code> (např. N245A).</div>';
             if (!(geojson.features || []).length) {
-                html += '<div class="hint">Nejdřív vytvoř aspoň jeden list, pak sem přidávej sloupce.</div>';
+                html += '<div class="hint">Nejdřív vytvoř aspoň jeden list, pak sem přidávej atributy.</div>';
             }
             keys.forEach(function (k) {
                 html += '<div class="col-row"><span class="cname">' + esc(k) + '</span>' +
@@ -174,7 +208,7 @@ window.SheetMapEditor = (function () {
                 html += '</div>';
             }
             html += '<div class="prop-row" style="margin-top:6px">' +
-                '<input type="text" id="newColName" placeholder="název sloupce" style="width:55%"/> ' +
+                '<input type="text" id="newColName" placeholder="název atributu" style="width:55%"/> ' +
                 '<button type="button" class="btn btn-xs btn-default" id="addColBtn">Přidat</button></div>';
             box.innerHTML = html;
             box.querySelector("#addColBtn").addEventListener("click", function () {
@@ -220,13 +254,135 @@ window.SheetMapEditor = (function () {
         }
         function afterColumnChange() {
             renderColumns();
+            renderTable();
             if (selectedFeature) { renderEditor(selectedFeature); }
+        }
+
+        // ---- bulk table: all sheets × all columns, editable in one grid ----
+        var tableEl = null;
+        function mountTable(el) { tableEl = el; renderTable(); }
+        // Mark the selected sheet's row (without a full re-render, so edits keep focus).
+        function highlightTableRow() {
+            if (!tableEl) { return null; }
+            var feats = geojson.features || [], target = null;
+            tableEl.querySelectorAll("tr[data-row]").forEach(function (tr) {
+                var f = feats[parseInt(tr.getAttribute("data-row"), 10)];
+                if (f && f === selectedFeature) { tr.classList.add("sel-row"); target = tr; }
+                else { tr.classList.remove("sel-row"); }
+            });
+            return target;
+        }
+        // Scroll the table to the selected sheet's row and flash it. Returns false if
+        // nothing is selected or the table isn't mounted.
+        function scrollToSelectedRow() {
+            var tr = highlightTableRow();
+            if (!tr) { return false; }
+            if (tr.scrollIntoView) { tr.scrollIntoView({ behavior: "smooth", block: "center" }); }
+            tr.classList.add("row-flash");
+            setTimeout(function () { tr.classList.remove("row-flash"); }, 1200);
+            return true;
+        }
+        // The same sheet can be edited in two places: the table and the selected-sheet
+        // detail card. Both write the one shared feature.properties; these mirror a fresh
+        // value into the OTHER view's DOM so they never drift (skips the field being typed
+        // in, to avoid stealing focus/cursor).
+        function attrEsc(s) { return String(s).replace(/[\\"]/g, "\\$&"); }
+        function mirrorToDetail(feature, key, value) {
+            if (feature !== selectedFeature) { return; }
+            try {
+                var d = props.querySelector('[data-key="' + attrEsc(key) + '"]');
+                if (d && d !== document.activeElement) { d.value = value; }
+            } catch (e) { /* ignore odd keys */ }
+        }
+        function mirrorToTable(feature, key, value) {
+            if (!tableEl) { return; }
+            var idx = (geojson.features || []).indexOf(feature);
+            if (idx < 0) { return; }
+            try {
+                if (key === "SHEET") {
+                    var row = tableEl.querySelector('tr[data-row="' + idx + '"]');
+                    var cell = row && row.querySelector("td.sheet-cell");
+                    if (cell) { cell.textContent = value || "—"; }
+                } else {
+                    var t = tableEl.querySelector('input[data-row="' + idx + '"][data-key="' + attrEsc(key) + '"]');
+                    if (t && t !== document.activeElement) { t.value = value; }
+                }
+            } catch (e) { /* ignore odd keys */ }
+        }
+        function renderTable() {
+            if (!tableEl) { return; }
+            var feats = geojson.features || [];
+            if (!feats.length) { tableEl.innerHTML = '<p class="hint" style="padding:8px">Zatím žádné listy.</p>'; return; }
+            var keys = fieldKeys();
+            var thead = '<thead><tr><th class="loc-col" title="Ukázat na mapě"></th>' + keys.map(function (k) {
+                var fill = k === "SHEET" ? "" :
+                    '<button type="button" class="colbtn" data-cfill="' + esc(k) + '" title="Vyplnit celý sloupec">⤓</button>' +
+                    '<button type="button" class="colbtn" data-cclear="' + esc(k) + '" title="Vymazat celý sloupec">✕</button>';
+                return '<th><div class="cbar"><span class="cn">' + esc(k) + '</span>' + fill + '</div></th>';
+            }).join("") + '</tr></thead>';
+            var rows = feats.map(function (f, i) {
+                var p = f.properties || (f.properties = {});
+                var selCls = (f === selectedFeature) ? ' class="sel-row"' : '';
+                // narrow first column: a locate icon is the click target (SHEET isn't
+                // always first, and clicking mid-table felt odd)
+                var locCell = '<td class="loc-cell"><a class="rowsel" data-row="' + i + '" title="Ukázat na mapě"><i class="fas fa-crosshairs"></i></a></td>';
+                return '<tr data-row="' + i + '"' + selCls + '>' + locCell + keys.map(function (k) {
+                    var val = p[k] == null ? "" : String(p[k]);
+                    if (k === "SHEET") {
+                        return '<td class="sheet-cell">' + (esc(val) || "—") + '</td>';
+                    }
+                    return '<td><input type="text" data-row="' + i + '" data-key="' + esc(k) + '" value="' + esc(val) + '"/></td>';
+                }).join("") + '</tr>';
+            }).join("");
+            tableEl.innerHTML = '<table class="sheet-table">' + thead + '<tbody>' + rows + '</tbody></table>';
+
+            tableEl.querySelectorAll("input[data-key]").forEach(function (el) {
+                el.addEventListener("input", function () {
+                    var f = feats[parseInt(el.getAttribute("data-row"), 10)];
+                    if (!f) { return; }
+                    var key = el.getAttribute("data-key");
+                    (f.properties || (f.properties = {}))[key] = el.value;
+                    mirrorToDetail(f, key, el.value);
+                });
+            });
+            tableEl.querySelectorAll("a.rowsel").forEach(function (a) {
+                a.addEventListener("click", function () {
+                    var f = feats[parseInt(a.getAttribute("data-row"), 10)], lyr = f && layerOf.get(f);
+                    if (f && lyr) {
+                        selectFeature(f, lyr);
+                        try { map.fitBounds(lyr.getBounds(), { maxZoom: 12 }); } catch (e) { /* ignore */ }
+                        var mp = document.getElementById("map");   // bring the map into view after picking a row
+                        if (mp && mp.scrollIntoView) { mp.scrollIntoView({ behavior: "smooth", block: "center" }); }
+                    }
+                });
+            });
+            tableEl.querySelectorAll("[data-cfill]").forEach(function (b) {
+                b.addEventListener("click", function () {
+                    var k = b.getAttribute("data-cfill");
+                    var v = prompt('Vyplnit sloupec "' + k + '" hodnotou (do všech listů):', "");
+                    if (v === null) { return; }
+                    pushHistory();
+                    feats.forEach(function (f) { (f.properties || (f.properties = {}))[k] = v; });
+                    renderTable(); if (selectedFeature) { renderEditor(selectedFeature); }
+                });
+            });
+            tableEl.querySelectorAll("[data-cclear]").forEach(function (b) {
+                b.addEventListener("click", function () {
+                    var k = b.getAttribute("data-cclear");
+                    if (!confirm('Vymazat hodnoty ve sloupci "' + k + '" u všech listů?')) { return; }
+                    pushHistory();
+                    feats.forEach(function (f) { if (f.properties) { f.properties[k] = ""; } });
+                    renderTable(); if (selectedFeature) { renderEditor(selectedFeature); }
+                });
+            });
         }
         // ---- property editor of selected sheet ----
         function renderEditor(feature) {
             var p = feature.properties || (feature.properties = {});
             var html = '<h5>List: <span class="sel">' + esc(p.SHEET || p.TITLE || "—") + '</span>' +
+                ' <button id="locateSheetBtn" class="btn btn-xs btn-default">Ukázat na mapě ↑</button>' +
                 ' <button id="delSheetBtn" class="btn btn-xs btn-danger">Smazat list</button></h5>';
+            html += '<div class="attr-grid">';
             fieldKeys().forEach(function (key) {
                 var val = p[key] == null ? "" : String(p[key]);
                 var big = val.length > 40;
@@ -236,35 +392,67 @@ window.SheetMapEditor = (function () {
                     : '<input type="text" data-key="' + esc(key) + '" value="' + esc(val) + '"/>';
                 html += '</div>';
             });
-            html += '<div id="coordBox" class="coords">' +
-                '<div class="hint" style="margin-top:8px">Souřadnice — dva protilehlé rohy + úhel (přesné umístění):</div>' +
-                '<div class="prop-row"><label>Roh 1 (šířka° / délka°)</label>' +
-                    '<input type="number" step="any" id="cLatA" style="width:48%"/> ' +
-                    '<input type="number" step="any" id="cLngA" style="width:48%"/></div>' +
-                '<div class="prop-row"><label>Roh 2 — protilehlý (šířka° / délka°)</label>' +
-                    '<input type="number" step="any" id="cLatC" style="width:48%"/> ' +
-                    '<input type="number" step="any" id="cLngC" style="width:48%"/></div>' +
+            html += '</div>';
+            var crsRow = window.proj4
+                ? '<div class="prop-row" style="margin-top:8px"><label>Souřadnicový systém</label>' +
+                    '<select id="cCrs" style="width:auto">' +
+                      '<option value="EPSG:4326">WGS84 — zeměpisné ° (šířka/délka)</option>' +
+                      '<option value="EPSG:5514">S-JTSK / Křovák — X/Y (m)</option>' +
+                    '</select></div>'
+                : '';
+            html += '<div id="coordBox" class="coords">' + crsRow +
+                '<div class="hint" style="margin-top:6px">Dva protilehlé rohy + úhel (přesné umístění):</div>' +
+                '<div class="prop-row"><label id="cLabA">Roh 1 (šířka° / délka°)</label>' +
+                    '<input type="number" step="any" id="cA1" style="width:48%"/> ' +
+                    '<input type="number" step="any" id="cA2" style="width:48%"/></div>' +
+                '<div class="prop-row"><label id="cLabC">Roh 2 — protilehlý (šířka° / délka°)</label>' +
+                    '<input type="number" step="any" id="cC1" style="width:48%"/> ' +
+                    '<input type="number" step="any" id="cC2" style="width:48%"/></div>' +
                 '<div class="prop-row"><label>Úhel (°)</label>' +
                     '<input type="number" step="any" id="cAng" style="width:48%"/></div>' +
                 '</div>';
             props.innerHTML = html;
             var db = document.getElementById("delSheetBtn");
             if (db) { db.addEventListener("click", deleteSelected); }
+            var lb = document.getElementById("locateSheetBtn");
+            if (lb) {
+                lb.addEventListener("click", function () {
+                    if (selectedLayer) { try { map.fitBounds(selectedLayer.getBounds(), { maxZoom: 13 }); } catch (e) { /* ignore */ } }
+                    var mp = document.getElementById("map");
+                    if (mp && mp.scrollIntoView) { mp.scrollIntoView({ behavior: "smooth", block: "center" }); }
+                });
+            }
             props.querySelectorAll("[data-key]").forEach(function (el) {
                 el.addEventListener("input", function () {
-                    feature.properties[el.getAttribute("data-key")] = el.value;
-                    if (el.getAttribute("data-key") === "SHEET" && selectedLayer) {
+                    var key = el.getAttribute("data-key");
+                    feature.properties[key] = el.value;
+                    if (key === "SHEET" && selectedLayer) {
                         var t = selectedLayer.getTooltip(); if (t) { t.setContent(String(el.value)); }
                     }
+                    mirrorToTable(feature, key, el.value);
                 });
             });
-            ["cLatA", "cLngA", "cLatC", "cLngC"].forEach(function (id) {
+            var crsSel = document.getElementById("cCrs");
+            if (crsSel) {
+                crsSel.value = coordCrs;
+                crsSel.addEventListener("change", function () {
+                    coordCrs = crsSel.value; relabelCoord(); updateCoordInputs();
+                });
+            }
+            ["cA1", "cA2", "cC1", "cC2"].forEach(function (id) {
                 var el = document.getElementById(id);
                 if (el) { el.addEventListener("change", function () { pushHistory(); applyCornerEdit(); }); }
             });
             var angEl = document.getElementById("cAng");
             if (angEl) { angEl.addEventListener("change", function () { pushHistory(); applyAngleEdit(); }); }
+            relabelCoord();
             updateCoordInputs();
+        }
+        function relabelCoord() {
+            var proj = coordCrs !== "EPSG:4326";
+            var la = document.getElementById("cLabA"), lc = document.getElementById("cLabC");
+            if (la) { la.textContent = proj ? "Roh 1 (X / Y v m)" : "Roh 1 (šířka° / délka°)"; }
+            if (lc) { lc.textContent = proj ? "Roh 2 — protilehlý (X / Y v m)" : "Roh 2 — protilehlý (šířka° / délka°)"; }
         }
 
         // ---- selection + rectangle handles ----
@@ -282,18 +470,18 @@ window.SheetMapEditor = (function () {
         function coordNum(id) { var el = document.getElementById(id); return el ? parseFloat(el.value) : NaN; }
         function updateCoordInputs() {
             if (!selectedFeature || !selRect || !document.getElementById("coordBox")) { return; }
-            var a = cornerLatLng(-1, -1), c = cornerLatLng(1, 1);
-            setCoord("cLatA", a.lat); setCoord("cLngA", a.lng);
-            setCoord("cLatC", c.lat); setCoord("cLngC", c.lng);
+            var da = llToDisplay(cornerLatLng(-1, -1)), dc = llToDisplay(cornerLatLng(1, 1));
+            setCoord("cA1", da[0]); setCoord("cA2", da[1]);
+            setCoord("cC1", dc[0]); setCoord("cC2", dc[1]);
             setCoord("cAng", selRect.angle * 180 / Math.PI);
         }
         // Editing a corner = same as dragging it: keep the current angle, recompute
         // centre/width/height from the two opposite corners.
         function applyCornerEdit() {
             if (!selectedFeature || !selRect) { return; }
-            var aLat = coordNum("cLatA"), aLng = coordNum("cLngA"), cLat = coordNum("cLatC"), cLng = coordNum("cLngC");
-            if ([aLat, aLng, cLat, cLng].some(isNaN)) { return; }
-            var A = projLL(L.latLng(aLat, aLng)), C = projLL(L.latLng(cLat, cLng));
+            var a1 = coordNum("cA1"), a2 = coordNum("cA2"), c1 = coordNum("cC1"), c2 = coordNum("cC2");
+            if ([a1, a2, c1, c2].some(isNaN)) { return; }
+            var A = projLL(displayToLL(a1, a2)), C = projLL(displayToLL(c1, c2));
             var ax = axes(selRect.angle), dx = C.x - A.x, dy = C.y - A.y;
             selRect.cx = (A.x + C.x) / 2; selRect.cy = (A.y + C.y) / 2;
             selRect.w = Math.max(1, Math.abs(dx * ax.ux.x + dy * ax.ux.y));
@@ -314,6 +502,7 @@ window.SheetMapEditor = (function () {
             if (selectedLayer) { selectedLayer.setStyle(baseStyle); }
             selectedFeature = null; selectedLayer = null; selRect = null;
             clearHandles();
+            notifySelect(null);
         }
         function selectFeature(feature, layer) {
             deselect();
@@ -324,6 +513,8 @@ window.SheetMapEditor = (function () {
             applyRect(feature, selRect, layer);   // snap this sheet to a clean rectangle
             renderEditor(feature);
             showHandles();
+            highlightTableRow();
+            notifySelect(feature);
         }
         function showHandles() {
             clearHandles();
@@ -491,12 +682,16 @@ window.SheetMapEditor = (function () {
             }).addTo(map);
             var count = (data.features || []).length;
             if (fit && count) { try { map.fitBounds(gridLayer.getBounds()); } catch (e) { /* ignore */ } }
+            var gridSub = document.getElementById("gridSub");
+            if (gridSub) {
+                gridSub.textContent = count ? "— " + count + " listů" : "— nakresli na mapě nebo nahraj soubor";
+            }
             props.innerHTML = count
-                ? '<p class="hint">Mřížka má <strong>' + count +
-                    '</strong> listů. Přibliž ať se ukážou čísla. Klikni na list (rohy + rotace) nebo přidej souseda „+".</p>'
-                : '<p class="hint">Zatím žádné listy — vytvoř první obdélník, nebo vygeneruj mřížku.</p>';
+                ? '<p class="hint">Klikni na list na mapě — jeho údaje, souřadnice a rotace se ukážou tady a půjdou upravit.</p>'
+                : '<p class="hint">Zatím žádné listy — vytvoř první obdélník, nebo vygeneruj mřížku (panel vpravo).</p>';
             updateLabels();
             renderColumns();
+            renderTable();
         }
 
         function updateLabels() {
@@ -615,6 +810,9 @@ window.SheetMapEditor = (function () {
                 loadGeojson((data && data.type) ? data : { type: "FeatureCollection", features: [] }, true);
             },
             hasFeatures: function () { return (geojson.features || []).length > 0; },
+            hasSelected: function () { return !!selectedFeature; },
+            mountTable: mountTable,
+            scrollToSelectedRow: scrollToSelectedRow,
             suggestColumns: function (list) { suggested = Array.isArray(list) ? list : []; renderColumns(); },
             invalidateSize: function () {
                 setTimeout(function () {
