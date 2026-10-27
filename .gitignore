@@ -16,3 +16,6 @@
 
 # Local dev secrets (GitHub OAuth client id/secret for docker compose)
 .env
+# OS / build output
+.DS_Store
+/index-boot/target/

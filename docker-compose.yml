@@ -4,7 +4,9 @@ services:
   mapseries:
     build: .
     image: mapseries:dev
-    restart: always
+    # Legacy oracle — only on demand: `docker compose --profile legacy up -d mapseries`
+    profiles: ["legacy"]
+    restart: "no"
     depends_on:
       - postgres
     environment:
