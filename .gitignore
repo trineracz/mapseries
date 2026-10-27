@@ -19,3 +19,6 @@
 # OS / build output
 .DS_Store
 /index-boot/target/
+# Compiled from catalog/ and edit/ during the Docker build (index-boot/Dockerfile)
+/index-boot/src/main/resources/static/catalog/
+/index-boot/src/main/resources/static/edit/

@@ -26,7 +26,10 @@ services:
   # New Spring Boot backend — now the PRIMARY app on :8080 (so the GitHub OAuth
   # callback registered for :8080 works). Serves everything the old app did.
   index-boot:
-    build: ./index-boot
+    build:
+      # Repo root as context so catalog/ and edit/ are compiled from source.
+      context: .
+      dockerfile: index-boot/Dockerfile
     restart: always
     depends_on:
       - postgres

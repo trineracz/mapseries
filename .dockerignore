@@ -1,0 +1,8 @@
+# Keep the build context small (root context is shared by both Dockerfiles).
+.git
+.env
+**/.DS_Store
+**/node_modules
+**/target
+catalog/dist
+edit/dist
