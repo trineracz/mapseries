@@ -1,7 +1,3 @@
-
-import ZeroClipboard from 'zeroclipboard'
-import $ from 'jquery'
-
 class Connection
   constructor: (@buttonId, @textFunc) ->
 
@@ -32,27 +28,6 @@ class JSConnection extends Connection
     document.getElementById(@buttonId).removeEventListener('click', @eventListener)
     @eventListener = null
 
-class FlashConnection extends Connection
-  constructor: (buttonId, textFunc) ->
-    super(buttonId, textFunc)
-    @zeroClipboardClient = null
-
-    @__createZeroClipboardConnection()
-
-  destroy: () ->
-    @__destroyZeroClipboardConnection()
-
-  __createZeroClipboardConnection: () ->
-    @zeroClipboardClient = new ZeroClipboard($(document.getElementById(@buttonId)))
-    @zeroClipboardClient.on('copy', @__eventListenerHandler)
-
-  __destroyZeroClipboardConnection: () ->
-    @zeroClipboardClient.destroy()
-
-  __eventListenerHandler: (e) =>
-    textToCopy = @textFunc()
-    @zeroClipboardClient.setText(textToCopy)
-
 class Clipboard
   @instance = null
 
@@ -69,19 +44,18 @@ class Clipboard
     connection.destroy() for connection in @connections
     @connections = []
 
+  # The old Flash (ZeroClipboard) fallback for browsers without the Clipboard
+  # API was removed: Flash is gone from every browser, so it could not work.
   registerButton: (buttonId, textFunc) ->
     if @isJSApiSupported()
       @createJSConnection(buttonId, textFunc)
     else
-      @createFlashConnection(buttonId, textFunc)
+      console.log('Clipboard API is not available (it needs HTTPS or localhost).')
 
   isJSApiSupported: () ->
     return navigator?.clipboard?.writeText
 
   createJSConnection: (buttonId, textFunc) ->
     @connections.push(new JSConnection(buttonId, textFunc))
-
-  createFlashConnection: (buttonId, textFunc) ->
-    @connections.push(new FlashConnection(buttonId, textFunc))
 
 export default Clipboard

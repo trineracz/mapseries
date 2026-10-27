@@ -25,36 +25,17 @@ Read [manual](client/src/doc/navod.docx). Or briefly:
 5. Get beer
 
 ## Development
-Repository structure based on [ol3ds](https://github.com/jirik/ol3ds).
+The catalog is a static frontend built with [Vite](https://vite.dev/) (Node 22).
+The Docker image of `index-boot` builds it and serves it at `/catalog`.
 
-### Requirements
-* [Java 7 or higher](http://www.java.com/)
-  * Windows users: `path/to/directory/with/java.exe` must be in your PATH system variable
-* [Python 2.7](https://www.python.org/downloads/) (32bit or 64bit; must correspond with node.js because of node-gyp)
-  * Windows users: `path/to/python/directory` and `path/to/python/directory/Scripts` must be in your PATH system variable
-* [node.js](http://nodejs.org/download/) (32bit or 64bit; must correspond with Python 2.7 because of node-gyp)
-* [grunt](http://gruntjs.com/) `npm install -g grunt-cli`
-* [bower](http://bower.io/) `npm install -g bower`
-* [git](http://git-scm.com/downloads)
-  * Windows users: `path/to/directory/with/git.exe` must be in your PATH system variable
-
-### Installation
 ```
-git clone https://github.com/klokan/mapseries-temap.git mapseries
-cd mapseries
-npm install
-bower install
-sudo grunt install (Linux) / grunt install (Windows)
+npm ci
+npx vite build        # -> dist/ (index.html, main.js, main.css, fonts, img, texts)
 ```
-#### Problems with installation
-Windows users: If you have some errors during `npm install` related to [node-gyp](https://github.com/TooTallNate/node-gyp), you will probably need to install [Microsoft Visual Studio C++ 2012 Express for Windows Desktop](http://www.microsoft.com/en-us/download/details.aspx?id=34673) and run the installation again.
 
-### Development
-* `grunt` to run dev server and open mapseries.html in web browser
-  * Edit e.g. content of `client/src/js/webpages/mapseries.js` and see changes in the browser
-* `grunt lint` to run gjslint
-* `grunt fix` to run fixjsstyle
-
-### Build
-* `grunt build` to compile the code and copy files to `client/public`
-* `grunt build --map` to include also [source maps](https://developer.chrome.com/devtools/docs/javascript-debugging#source-maps)
+* Entry: `src/js/entry.js` (jQuery globals, styles, `main.coffee`).
+* `src/js/closure/closure-lite.js` replaces the Google Closure Library the
+  template dialog was written against (same DOM, CSS classes and behaviour).
+* `parity/` checks that a build behaves and looks exactly like a reference
+  build (clipboard output for every series, DOM and screenshots) — see
+  `parity/parity.sh`.

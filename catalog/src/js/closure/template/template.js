@@ -1,11 +1,6 @@
-goog.provide('ms.Template');
-
-goog.require('goog.dom.classlist');
-goog.require('goog.json');
-goog.require('goog.ui.ComboBox');
-goog.require('goog.ui.Dialog');
-goog.require('goog.html.legacyconversions');
-goog.require('ms.ComboBox');
+import goog from '../closure-lite';
+import ms from '../ms';
+import './combobox';
 
 import Clipboard from 'clipboard'
 import ebus from 'ebus'
@@ -710,3 +705,5 @@ ms.Template.prototype.onKey_ = function (e) {
     this.setVisible(false);
   }
 };
+
+export default ms.Template;

@@ -1,4 +1,4 @@
-goog.provide('ms.ValueItem');
+import ms from '../ms';
 
 
 
@@ -27,3 +27,5 @@ ms.ValueItem = function() {
   this.value;
 
 };
+
+export default ms.ValueItem;

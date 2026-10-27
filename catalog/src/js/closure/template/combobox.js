@@ -1,8 +1,7 @@
-goog.provide('ms.ComboBox');
-
-goog.require('goog.ui.ComboBox');
-goog.require('ms.ValueItem');
-goog.require('ms.latlng');
+import goog from '../closure-lite';
+import ms from '../ms';
+import '../latlng';
+import './valueitem';
 
 import mapboxgl from 'mapbox-gl'
 
@@ -202,3 +201,5 @@ ms.ComboBox.prototype.formatValue = function(value, sheet) {
   results = results || [''];
   return results;
 };
+
+export default ms.ComboBox;

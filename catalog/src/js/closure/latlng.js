@@ -1,6 +1,7 @@
-goog.provide('ms.latlng');
+import goog from './closure-lite';
+import ms from './ms';
 
-goog.require('goog.string');
+ms.latlng = {};
 
 
 
@@ -227,3 +228,5 @@ ms.latlng.bboxToMarc21_255InEnglish = function(bbox) {
 
   return result;
 };
+
+export default ms.latlng;
