@@ -48,3 +48,14 @@ mapseries:
     # true = editor validates + logs writes but skips the GitHub commit
     # (for local click-through when the OAuth app isn't approved on the write org).
     dry-run: ${MAPSERIES_EDITOR_DRY_RUN:false}
+  # Národní autority ČR — imported from the weekly NK dump (one download instead
+  # of tens of thousands of OAI requests). Kept: 110 corporate bodies, 150 topics,
+  # 151 geographic names, 155 genre/form terms.
+  authorities:
+    dump-url: ${MAPSERIES_AUTHORITY_DUMP_URL:https://aleph.nkp.cz/data/aut.xml.gz}
+    tags: [ "110", "150", "151", "155" ]
+    import-limit: ${MAPSERIES_AUTHORITY_IMPORT_LIMIT:0}
+    # true = import once at start-up if the table is empty (e.g. first deployment)
+    import-if-empty-on-start: ${MAPSERIES_AUTHORITY_IMPORT_IF_EMPTY:false}
+    # Spring cron for the automatic re-import; "-" = off (trigger by hand).
+    cron: ${MAPSERIES_AUTHORITY_CRON:-}
