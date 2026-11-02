@@ -139,6 +139,14 @@ export default {
     "cs": "Chybí název listu (245 $a)",
     "en": "Sheet title missing (245 $a)"
   },
+  "template-add": {
+    "cs": "+ přidat do šablony",
+    "en": "+ add to the template"
+  },
+  "template-add-hint": {
+    "cs": "Tato hodnota v šabloně není. Otevře editor šablony (po přihlášení) s připraveným řádkem ke kontrole a uložení.",
+    "en": "The template does not have this value. Opens the template editor (after a login) with the row prepared to check and save."
+  },
   "authority-only": {
     "cs": "Hodnotu nelze napsat ručně – vyberte ji ze šablony nebo z Národních autorit ČR (napište část názvu).",
     "en": "The value cannot be typed in – choose it from the template or from the Czech National Authority File (type a part of the name)."

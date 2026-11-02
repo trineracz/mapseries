@@ -704,7 +704,114 @@ ms.Template.prototype.initAuthorityFields_ = function (sheet) {
     } else {
       this.initCorporation_(cb, sheet);
     }
+    goog.events.listen(cb, 'change', this.updateTemplateAdditions_, false, this);
   }, this);
+  this.updateTemplateAdditions_();
+};
+
+
+/**
+ * Key of a field linked to a base, the same as the template editor computes
+ * it (template-form.js columnKeys): tag + subfield or indicator position +
+ * occurrence among the fields linked to that base.
+ * @param {ms.ComboBox} base base combo box.
+ * @return {Array.<{cb: ms.ComboBox, key: string}>} linked fields with keys.
+ * @private
+ */
+ms.Template.prototype.linkedFieldKeys_ = function (base) {
+  var seen = {};
+  return goog.array.map(goog.array.filter(this.getDependent_(base), function (cb) {
+    return !!cb.valuesByBaseIndex;
+  }), function (cb) {
+    var k = cb.tag + (cb.subfield ? '$' + cb.subfield : cb.offset === 3 ? 'ind' : '@' + cb.offset);
+    seen[k] = (seen[k] || 0) + 1;
+    return { cb: cb, key: k + '#' + (seen[k] - 1) };
+  });
+};
+
+
+/**
+ * Offer to add to the template what the cataloger chose from the authority
+ * file and the template does not have: a corporation (110, with all the
+ * values filled in for it) or a related corporation (710) of a template
+ * corporation. The button opens the template editor (after a login) with the
+ * row prepared there; the addition is passed on in localStorage.
+ * @private
+ */
+ms.Template.prototype.updateTemplateAdditions_ = function () {
+  goog.array.forEach(document.querySelectorAll('.template-add'), function (el) { el.remove(); });
+  goog.array.forEach(this.fields, function (cb) {
+    if (!cb.authorityType || !cb.getElement() || !this.templateAddition_(cb)) {
+      return;
+    }
+    var button = goog.dom.createDom('a', { 'class': 'template-add', 'href': '#',
+      'title': languages.getText('template-add-hint') }, languages.getText('template-add'));
+    goog.events.listen(button, 'click', function (e) {
+      e.preventDefault();
+      // the values as they are now (filled in after the corporation was chosen)
+      var add = this.templateAddition_(cb);
+      if (!add) {
+        return;
+      }
+      try {
+        localStorage.setItem('mapseries.templateAddition', JSON.stringify(add));
+      } catch (err) {
+        return;
+      }
+      window.open('/admin/series/edit?grid=' + encodeURIComponent(add.grid), '_blank');
+    }, false, this);
+    // at the end of its MARC field (after the $7 code), not inside it
+    var last = cb.getElement().parentNode;
+    goog.array.forEach(this.fields, function (other) {
+      var div = other.getElement() && other.getElement().parentNode;
+      if (div && other.fieldIdx === cb.fieldIdx &&
+          (last.compareDocumentPosition(div) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+        last = div;
+      }
+    });
+    goog.dom.insertSiblingAfter(button, last);
+  }, this);
+};
+
+
+/**
+ * What to add to the template for a corporation field, or null when its value
+ * is in the template: a new row for a corporation (110) with everything filled
+ * in for it, or the related corporation (710) for the row of the template
+ * corporation (matched by its $7).
+ * @param {ms.ComboBox} cb combo box of 110 $a or 710 $a.
+ * @return {Object} addition.
+ * @private
+ */
+ms.Template.prototype.templateAddition_ = function (cb) {
+  var add = null;
+  if (!cb.base && cb.authority) {
+    var cells = {};
+    goog.array.forEach(this.linkedFieldKeys_(cb), function (f) {
+      cells[f.key] = f.cb.getValue();
+    });
+    add = { base: cb.id, main: { marc: cb.authority['marc'], code: cb.authority['code'], ind1: cb.authority['ind1'] },
+      cells: cells };
+  } else if (cb.base && !cb.base.authority && cb.relatedAuthority_ && cb.getValue() === cb.relatedAuthority_.value) {
+    var code = goog.array.find(this.getDependent_(cb.base), function (dep) {
+      return dep.fieldIdx === cb.base.fieldIdx && dep.subfield === '7';
+    });
+    var mine = {};
+    goog.array.forEach(this.linkedFieldKeys_(cb.base), function (f) {
+      if (f.cb === cb || (f.cb.fieldIdx === cb.fieldIdx && f.cb.offset === 3)) {
+        mine[f.key] = f.cb.getValue();
+      }
+    });
+    if (code && code.getValue()) {
+      add = { base: cb.base.id, match: { code: code.getValue() }, cells: mine };
+    }
+  }
+  if (add) {
+    add.grid = this.series_.layer;
+    add.sheet = this.sheet_.properties['SHEET'];
+    add.created = Date.now();
+  }
+  return add;
 };
 
 
@@ -858,6 +965,9 @@ ms.Template.prototype.initRelatedCorporation_ = function (cb, sheet) {
       goog.array.forEach(indicators, function (ind) {
         ind.getInputElement().value = record['ind1'] || '2';
       });
+      cb.relatedAuthority_ = { value: value };
+    } else {
+      cb.relatedAuthority_ = null;
     }
     allowed.push(identity(value));
     cb.pickValue(value, -1);
@@ -1009,6 +1119,8 @@ ms.Template.prototype.showSheet = function (sheet, series, map) {
   if (notice) {
     notice.remove();
   }
+  this.series_ = series;
+  this.sheet_ = sheet;
   this.createHtmlAndComboBoxes_(template, series, map);
   this.initComboBoxes_(sheet, series, map);
 
@@ -1024,6 +1136,88 @@ ms.Template.prototype.showSheet = function (sheet, series, map) {
 
   ebus.fire('dialog-shown');
 
+  // after 'dialog-shown': the layout sets the dialog's final width
+  var fit = goog.bind(function () {
+    try {
+      this.fitFieldsToWidth_();
+    } catch (e) {
+      console.log('Fitting the fields failed: ' + e);
+    }
+  }, this);
+  fit();
+  if (!this.fitListener_) {
+    this.fitListener_ = fit;
+    window.addEventListener('resize', fit);
+  }
+
+};
+
+
+/**
+ * Make fields that would reach past the right edge of the template narrower,
+ * so that it does not scroll sideways (a long 245 $c is ~1000 px wide). The
+ * text stays the same, it only scrolls inside the field. The template's
+ * widths come back when there is room again. Long lines of plain text (e.g.
+ * a 500 note) wrap.
+ * @private
+ */
+ms.Template.prototype.fitFieldsToWidth_ = function () {
+  var pre = this.getContentElement() && this.getContentElement().querySelector('pre');
+  if (!pre || !this.isVisible()) {
+    return;
+  }
+  var MIN = 80;
+  // measured on unwrapped lines; the wrapping (CSS) is back at the end, so
+  // only lines of text that still do not fit wrap, never a field's line
+  pre.style.whiteSpace = 'pre';
+  var fields = goog.array.filter(this.fields, function (cb) {
+    return cb.getElement() && cb.getInputElement();
+  });
+  var setWidth = function (cb, width) {
+    cb.getElement().parentNode.style.width = width;
+    cb.getInputElement().style.width = width;
+  };
+  // the template's widths first
+  goog.array.forEach(fields, function (cb) {
+    var div = cb.getElement().parentNode;
+    if (!div.hasAttribute('data-width')) {
+      div.setAttribute('data-width', div.style.width || '');
+    }
+    setWidth(cb, div.getAttribute('data-width'));
+  });
+  var right = pre.getBoundingClientRect().left + pre.clientWidth - 8;
+  // then, while a field reaches past the edge, the widest field of its line
+  // gives up the overflow
+  var stuck = [];   // lines with nothing left to narrow (only small fields)
+  var onStuckLine = function (top) {
+    return stuck.some(function (t) { return Math.abs(t - top) < 4; });
+  };
+  for (var round = 0; round < 500; round++) {
+    var worst = null;
+    goog.array.forEach(fields, function (cb) {
+      var rect = cb.getElement().getBoundingClientRect(), over = rect.right - right;
+      if (rect.width && over > 0.5 && !onStuckLine(rect.top) && (!worst || over > worst.over)) {
+        worst = { over: over, top: rect.top };
+      }
+    });
+    if (!worst) {
+      break;
+    }
+    var widest = null;
+    goog.array.forEach(fields, function (cb) {
+      var w = cb.getInputElement().getBoundingClientRect().width;
+      if (Math.abs(cb.getElement().getBoundingClientRect().top - worst.top) < 4 && w > MIN &&
+          (!widest || w > widest.w)) {
+        widest = { cb: cb, w: w };
+      }
+    });
+    if (!widest) {
+      stuck.push(worst.top);
+      continue;
+    }
+    setWidth(widest.cb, Math.round(Math.max(MIN, widest.w - Math.ceil(worst.over))) + 'px');
+  }
+  pre.style.whiteSpace = '';
 };
 
 

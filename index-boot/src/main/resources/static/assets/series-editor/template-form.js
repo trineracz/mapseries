@@ -85,7 +85,9 @@ window.TemplateForm = (function () {
             });
             if (deps.length) {
                 tables.push(makeTable(b, deps));
-            } else if (o.enabled !== false && TECHNICAL.indexOf(o.id) < 0) {
+            } else if (o.enabled !== false && TECHNICAL.indexOf(o.id) < 0 && b.subfield) {
+                // (a drop-down of an indicator, e.g. 651 second indicator 7/4, is a
+                // code with a fixed meaning, not an offer: only in the text)
                 lists.push(b);
             }
         });
@@ -105,6 +107,18 @@ window.TemplateForm = (function () {
         return b.tag;
     }
 
+    // A key of a linked field that the catalogue computes the same way:
+    // tag + subfield (or indicator position) + its occurrence among the fields
+    // linked to the same controlling field, e.g. "008@26#1", "245$c#0", "710ind#0".
+    function columnKeys(deps) {
+        var seen = {};
+        return deps.map(function (d) {
+            var k = d.tag + (d.subfield ? "$" + d.subfield : d.offset === 3 ? "ind" : "@" + d.offset);
+            seen[k] = (seen[k] || 0) + 1;
+            return k + "#" + (seen[k] - 1);
+        });
+    }
+
     function makeTable(base, deps) {
         var corp = base.tag === "110" && base.subfield === "a";
         var cols = deps.map(function (d) {
@@ -117,6 +131,8 @@ window.TemplateForm = (function () {
             else if (d.tag.charAt(0) === "7" || wholeLine(d)) { kind = "optional"; }
             return { block: d, kind: kind, label: d.obj.title || d.obj.id || "", where: where(d) };
         });
+        var keys = columnKeys(deps);
+        cols.forEach(function (c, i) { c.key = keys[i]; });
         // the indicator of an added entry belongs to the entry in the same field
         cols.forEach(function (c) {
             if (c.kind === "entry") {
@@ -402,10 +418,10 @@ window.TemplateForm = (function () {
                 ? "Každý řádek je jedna korporace. Když ji katalogizátor vybere, vyplní se podle řádku i ostatní sloupce."
                 : "Každý řádek je jedna hodnota nabídky. Když ji katalogizátor vybere, vyplní se podle řádku i ostatní sloupce.") + "</p>";
             h += '<div class="tf-problems"></div>';
-            h += '<div class="tf-scroll"><table class="tf-table"><thead><tr><th class="tf-num">#</th><th></th>';
-            h += '<th class="tf-main">' + esc(b.title || b.id) + '<span class="tf-where">' + esc(where(t.base)) + "</span></th>";
+            h += '<div class="tf-scroll"><table class="tf-table" lang="cs"><thead><tr><th class="tf-num">#</th><th class="w-act"></th>';
+            h += '<th class="tf-main w-main">' + esc(b.title || b.id) + '<span class="tf-where">' + esc(where(t.base)) + "</span></th>";
             t.cols.forEach(function (c) {
-                h += "<th>" + esc(c.label) + '<span class="tf-where">' + esc(c.where) + "</span></th>";
+                h += '<th class="w-' + colWidth(c) + '">' + esc(c.label) + '<span class="tf-where">' + esc(c.where) + "</span></th>";
             });
             h += "</tr></thead><tbody>";
             b.values.forEach(function (v, r) {
@@ -418,7 +434,7 @@ window.TemplateForm = (function () {
                     h += '<td class="tf-main" data-c="-1"><span class="tf-ident" title="' + esc(v) + '">' + esc(readable(v)) + "</span>" +
                         '<button type="button" class="tf-pick" title="Vybrat z Národních autorit">Změnit…</button></td>';
                 } else {
-                    h += '<td class="tf-main" data-c="-1"><input type="text" value="' + esc(v) + '"/></td>';
+                    h += '<td class="tf-main" data-c="-1"><textarea rows="1">' + esc(v) + "</textarea></td>";
                 }
                 t.cols.forEach(function (c, ci) {
                     var arr = c.block.obj.valuesByBaseIndex, cv = r < arr.length ? arr[r] : "";
@@ -434,10 +450,10 @@ window.TemplateForm = (function () {
                             (cv ? '<span class="tf-code">' + esc((String(cv).match(/\$\$7([^$]*)/) || ["", ""])[1]) + "</span>" : "") +
                             '<button type="button" class="tf-pick" title="Vybrat z Národních autorit">' + (cv ? "Změnit…" : "Vybrat…") + "</button>" +
                             (cv ? '<button type="button" class="tf-clear" title="Žádná">✕</button>' : "");
+                    } else if (colWidth(c) === "short") {
+                        h += '<input type="text" class="tf-short" value="' + esc(cv) + '"/>';
                     } else {
-                        var cls = c.kind.indexOf("ind") >= 0 || (c.block.tag === "008") ? "tf-short" :
-                            String(cv).length > 14 || c.block.subfield ? "tf-long" : "";
-                        h += '<input type="text" value="' + esc(cv) + '" title="' + esc(cv) + '"' + (cls ? ' class="' + cls + '"' : "") + "/>";
+                        h += '<textarea rows="1">' + esc(cv) + "</textarea>";
                     }
                     h += "</td>";
                 });
@@ -449,11 +465,20 @@ window.TemplateForm = (function () {
             return h + "</div>";
         }
 
+        function colWidth(c) {
+            if (c.kind === "ind" || c.kind === "entryInd" || c.block.tag === "008") { return "short"; }
+            if (c.kind === "code") { return "code"; }
+            if (c.kind === "entry") { return "wide"; }
+            return "text";
+        }
+
         function listHtml(b, li) {
             var o = b.obj, title = o.title || o.id;
             var same = model.lists.filter(function (x) { return (x.obj.title || x.obj.id) === title; });
             if (same.length > 1) { title += " (" + (same.indexOf(b) + 1) + ".)"; }
-            var h = '<div class="tf-card tf-list" data-l="' + li + '"><h5>' + esc(title) +
+            // longer values (e.g. 500 notes) get a whole line each
+            var long = o.values.some(function (v) { return String(v).length > 16; });
+            var h = '<div class="tf-card tf-list' + (long ? " tf-list-long" : "") + '" data-l="' + li + '"><h5>' + esc(title) +
                 ' <span class="tf-where">' + esc(where(b)) + "</span></h5><div class=\"tf-items\">";
             o.values.forEach(function (v, i) {
                 h += '<span class="tf-item" data-i="' + i + '"><input type="text" value="' + esc(v) + '"/>' +
@@ -472,11 +497,73 @@ window.TemplateForm = (function () {
                 "Přidat nebo odebrat celé pole MARC jde zatím jen v textu (pokročilé).</p>";
             model.tables.forEach(function (t, ti) { h += tableHtml(t, ti); });
             if (model.lists.length) {
-                h += '<h4 class="tf-section">Další nabídky</h4>';
+                h += '<h4 class="tf-section">Další nabídky</h4><p class="hint">Hodnoty, které katalog nabídne ' +
+                    "v rozbalovacím poli (katalogizátor z nich vybírá, nic dalšího se podle nich nevyplňuje).</p>";
                 model.lists.forEach(function (b, li) { h += listHtml(b, li); });
             }
             root.innerHTML = h;
+            root.querySelectorAll("textarea").forEach(grow);
             mark();
+        }
+
+        // a cell grows with its text instead of scrolling
+        function grow(ta) {
+            ta.style.height = "auto";
+            ta.style.height = ta.scrollHeight + 2 + "px";
+        }
+        root.addEventListener("input", function (e) {
+            if (e.target.tagName === "TEXTAREA") { grow(e.target); }
+        });
+        // a click anywhere in a cell (not only on the text box) edits its value
+        root.addEventListener("click", function (e) {
+            var td = e.target.closest("td, .tf-item");
+            if (!td || e.target.closest("button, input, textarea")) { return; }
+            var field = td.querySelector("input:not(.tf-roles), textarea");
+            if (field) { field.focus(); }
+        });
+        // a value is one line: Enter confirms it
+        root.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")) {
+                e.preventDefault();
+                e.target.blur();
+            }
+        });
+
+        // ---------- animations: what moved where ----------
+
+        function rowsOf(ti) {
+            var card = root.querySelector('.tf-card[data-t="' + ti + '"]'), rows = {};
+            if (card) {
+                card.querySelectorAll("tbody tr").forEach(function (tr) { rows[tr.getAttribute("data-r")] = tr; });
+            }
+            return rows;
+        }
+        function tops(ti) {
+            var out = {}, rows = rowsOf(ti);
+            Object.keys(rows).forEach(function (r) { out[r] = rows[r].getBoundingClientRect().top; });
+            return out;
+        }
+        function slide(tr, dy) {
+            if (!tr || !dy) { return; }
+            tr.style.transition = "none";
+            tr.style.transform = "translateY(" + dy + "px)";
+            tr.getBoundingClientRect();
+            tr.style.transition = "transform .5s ease";
+            tr.style.transform = "";
+        }
+        function flash(tr, scroll) {
+            if (!tr) { return; }
+            tr.classList.remove("tf-flash");
+            tr.getBoundingClientRect();
+            tr.classList.add("tf-flash");
+            if (scroll) { tr.scrollIntoView({ block: "center", behavior: "smooth" }); }
+        }
+        // rows "from" and "to" swapped: both slide from where they were
+        function animateSwap(ti, from, to, before) {
+            var rows = rowsOf(ti);
+            slide(rows[to], before[from] - rows[to].getBoundingClientRect().top);
+            slide(rows[from], before[to] - rows[from].getBoundingClientRect().top);
+            flash(rows[to], false);
         }
 
         // mark problem cells and list them above each table
@@ -505,7 +592,7 @@ window.TemplateForm = (function () {
 
         root.addEventListener("change", function (e) {
             var input = e.target;
-            if (input.tagName !== "INPUT") { return; }
+            if (input.tagName !== "INPUT" && input.tagName !== "TEXTAREA") { return; }
             var card = input.closest(".tf-card"), changed = {};
             if (card.hasAttribute("data-t")) {
                 var t = model.tables[+card.getAttribute("data-t")];
@@ -561,7 +648,7 @@ window.TemplateForm = (function () {
                 }
                 return;
             }
-            var t = model.tables[+card.getAttribute("data-t")];
+            var ti = +card.getAttribute("data-t"), t = model.tables[ti];
             var tr = btn.closest("tr"), r = tr ? +tr.getAttribute("data-r") : -1;
             var td = btn.closest("td"), ci = td ? +td.getAttribute("data-c") : NaN;
             var all = function () {
@@ -580,18 +667,26 @@ window.TemplateForm = (function () {
                     all().forEach(function (arr) { arr.push(""); });
                     if (rec) { applyBase(t, t.base.obj.values.length - 1, rec); }
                     commit(changed, true);
+                    flash(rowsOf(ti)[t.base.obj.values.length - 1], true);
                 };
                 if (t.corp) { pickAuthority("Přidat korporaci", "", add); } else { add(null); }
             } else if (btn.classList.contains("tf-del")) {
-                if (!confirm("Smazat řádek " + (r + 1) + " „" + t.base.obj.values[r] + "“ i se všemi jeho hodnotami?")) { return; }
-                var changed = everything(pad(t));
-                all().forEach(function (arr) { arr.splice(r, 1); });
-                commit(changed, true);
+                if (!confirm("Smazat řádek " + (r + 1) + " „" + readable(t.base.obj.values[r]) + "“ i se všemi jeho hodnotami?")) { return; }
+                // the row fades out first, so it is clear which one goes
+                tr.classList.add("tf-leaving");
+                setTimeout(function () {
+                    var changed = everything(pad(t));
+                    all().forEach(function (arr) { arr.splice(r, 1); });
+                    commit(changed, true);
+                }, 300);
             } else if (btn.classList.contains("tf-up") || btn.classList.contains("tf-down")) {
-                var to = btn.classList.contains("tf-up") ? r - 1 : r + 1;
+                var to = btn.classList.contains("tf-up") ? r - 1 : r + 1, before = tops(ti);
                 var changed2 = everything(pad(t));
                 all().forEach(function (arr) { var x = arr[r]; arr[r] = arr[to]; arr[to] = x; });
                 commit(changed2, true);
+                animateSwap(ti, r, to, before);
+                var moved = rowsOf(ti)[to].querySelector(btn.classList.contains("tf-up") ? ".tf-up" : ".tf-down");
+                if (moved && !moved.disabled) { moved.focus(); }
             } else if (btn.classList.contains("tf-pick")) {
                 if (ci < 0) {
                     pickAuthority("Korporace v řádku " + (r + 1), t.base.obj.values[r], function (rec) {
@@ -616,9 +711,52 @@ window.TemplateForm = (function () {
             model = build(opts.getText());
             render();
         }
+
+        /**
+         * A value the cataloguer used that the template does not have, sent from
+         * the catalogue ("Přidat do šablony"): { base, main: {marc, code, ind1},
+         * match: {code}, cells: {columnKey: value}, sheet }. With "match" the
+         * row of that corporation gets the cells, otherwise a new row is added.
+         * The row is shown and marked; nothing is saved until "Uložit sérii".
+         * @return {string|null} what was done, or null if it does not fit.
+         */
+        function prefill(add) {
+            var ti = -1;
+            model.tables.forEach(function (t, i) { if (ti < 0 && t.base.obj.id === add.base) { ti = i; } });
+            if (ti < 0) { return null; }
+            var t = model.tables[ti], changed = everythingOf(t, pad(t)), r = -1;
+            if (add.match && add.match.code) {
+                var codeCol = t.cols.filter(function (c) { return c.kind === "code"; })[0];
+                r = codeCol ? codeCol.block.obj.valuesByBaseIndex.indexOf(add.match.code) : -1;
+            }
+            var isNew = r < 0;
+            if (isNew) {
+                [t.base.obj.values].concat(t.cols.map(function (c) { return c.block.obj.valuesByBaseIndex; }))
+                    .forEach(function (arr) { arr.push(""); });
+                r = t.base.obj.values.length - 1;
+                if (add.main) { applyBase(t, r, add.main); }
+            }
+            t.cols.forEach(function (c) {
+                var v = add.cells ? add.cells[c.key] : undefined;
+                if (typeof v === "string" && v !== "" && c.kind !== "code" && c.kind !== "ind") {
+                    c.block.obj.valuesByBaseIndex[r] = v;
+                }
+            });
+            commit(changed, true);
+            var tr = rowsOf(ti)[r];
+            flash(tr, true);
+            if (tr) { tr.classList.add("tf-prefilled"); }
+            return isNew ? "Přidán řádek " + (r + 1) : "Doplněn řádek " + (r + 1);
+        }
+        function everythingOf(t, changed) {
+            changed[t.base.idx] = true;
+            t.cols.forEach(function (c) { changed[c.block.idx] = true; });
+            return changed;
+        }
+
         refresh();
-        return { refresh: refresh };
+        return { refresh: refresh, prefill: prefill };
     }
 
-    return { init: init, _build: build, _serialize: serialize, _check: check };
+    return { init: init, _build: build, _serialize: serialize, _check: check, _columnKeys: columnKeys };
 })();

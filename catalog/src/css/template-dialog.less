@@ -67,12 +67,16 @@
 .template-dialog-content pre {
   color: white;
   overflow: auto;
+  /* long lines of text wrap instead of scrolling sideways (the fields are
+     narrowed first so that their lines fit, see Template.fitFieldsToWidth_) */
+  white-space: pre-wrap;
   padding: 0;
   margin: 0;
 }
 
 .template-dialog-content pre .combo {
   display: inline;
+  white-space: nowrap;
 }
 
 .template-dialog-content pre .combo.disabled .goog-combobox-button {

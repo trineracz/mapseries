@@ -106,18 +106,36 @@
         .tf-section { font-size: 15px; margin: 18px 0 8px; }
         .tf-where { font-family: monospace; font-size: 11px; color: #0b5; margin-left: 6px; font-weight: normal; }
         th .tf-where { display: block; margin-left: 0; }
+        /* columns keep a readable width (text wraps, cells grow); a table wider
+           than the page scrolls sideways on its own, the page does not */
         .tf-scroll { overflow-x: auto; margin: 6px 0 8px; }
-        table.tf-table { border-collapse: collapse; font-size: 12px; }
-        table.tf-table th, table.tf-table td { border: 1px solid #e5e5e5; padding: 3px 5px; vertical-align: top; }
-        table.tf-table th { background: #f6f7f9; text-align: left; font-weight: 600; min-width: 70px; }
-        table.tf-table td input { border: 1px solid transparent; background: transparent; font-size: 12px;
-            padding: 1px 3px; min-width: 120px; width: 100%; font-family: monospace; }
-        table.tf-table td input.tf-short { min-width: 34px; width: 48px; text-align: center; }
-        table.tf-table td input.tf-long { min-width: 260px; }
-        table.tf-table td input:focus { border-color: #3388ff; background: #fff; }
+        table.tf-table { border-collapse: collapse; font-size: 12px; width: 100%; }
+        table.tf-table th.w-act { min-width: 80px; }
+        table.tf-table th.w-main { min-width: 220px; }
+        table.tf-table th.w-short { min-width: 64px; width: 64px; }
+        table.tf-table th.w-code { min-width: 110px; }
+        table.tf-table th.w-text { min-width: 170px; }
+        table.tf-table th.w-wide { min-width: 220px; }
+        table.tf-table th, table.tf-table td { border: 1px solid #e5e5e5; padding: 3px 5px; vertical-align: top;
+            overflow-wrap: break-word; }
+        table.tf-table th { background: #f6f7f9; text-align: left; font-weight: 600; overflow-wrap: normal;
+            hyphens: auto; -webkit-hyphens: auto; }
+        table.tf-table td textarea, table.tf-table td input { display: block; width: 100%; box-sizing: border-box;
+            border: 1px solid #d5d9de; border-radius: 2px; background: #fff; font-size: 12px; padding: 2px 4px;
+            font-family: monospace; resize: none; overflow: hidden; line-height: 1.35; }
+        table.tf-table td:has(input, textarea) { cursor: text; }
+        table.tf-table td input.tf-short { text-align: center; }
+        table.tf-table td textarea:hover, table.tf-table td input:hover { border-color: #9fb3c8; }
+        table.tf-table td textarea:focus, table.tf-table td input:focus { border-color: #3388ff; background: #fff; outline: none; }
+        table.tf-table tbody tr { background: #fff; }
+        table.tf-table tr.tf-flash td { animation: tf-flash 1.6s ease; }
+        @keyframes tf-flash { from { background: #fff3a8; } to { background: transparent; } }
+        table.tf-table tr.tf-leaving { opacity: 0; transition: opacity .3s ease; }
+        table.tf-table tr.tf-prefilled td.tf-num { box-shadow: inset 3px 0 0 #2e7d32; }
+        .tf-banner { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; padding: 8px 12px; margin-bottom: 10px; }
         table.tf-table td.tf-bad { background: #fff1f0; box-shadow: inset 0 0 0 1px #e0605a; }
         .tf-num { color: #999; text-align: right; }
-        .tf-main { min-width: 260px; }
+        .tf-main .tf-pick { margin: 2px 0 0; }
         .tf-ident { font-family: monospace; margin-right: 6px; }
         .tf-code { font-family: monospace; color: #888; font-size: 11px; margin-right: 6px; }
         .tf-ro { color: #999; font-family: monospace; }
@@ -125,12 +143,18 @@
             font-size: 11px; padding: 0 6px; margin-left: 2px; }
         .tf-row-actions { white-space: nowrap; }
         .tf-main .tf-ident { font-family: inherit; font-weight: 600; }
-        input.tf-roles { min-width: 80px !important; width: 90px !important; color: #b26a00; }
+        table.tf-table td input.tf-roles { display: inline-block; width: 90px; color: #b26a00; }
+        .tf-entry .tf-pick, .tf-entry .tf-clear { margin-top: 2px; }
         .tf-problems { font-size: 12px; color: #b23a2e; }
         .tf-problems ul { margin: 4px 0 0; padding-left: 18px; }
         .tf-items { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
         .tf-item { border: 1px solid #ddd; border-radius: 3px; padding: 1px 2px 1px 4px; }
-        .tf-item input { border: none; font-family: monospace; font-size: 12px; width: 140px; }
+        .tf-item input { border: none; font-family: monospace; font-size: 12px; width: 140px; outline: none; }
+        .tf-item { cursor: text; background: #fff; }
+        .tf-item:focus-within { border-color: #3388ff; }
+        .tf-list-long .tf-items { display: block; }
+        .tf-list-long .tf-item { display: flex; margin-bottom: 6px; }
+        .tf-list-long .tf-item input { flex: 1; width: auto; }
         .tf-item .tf-del { border: none; background: none; color: #999; }
         .tf-modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 3000; display: none;
             align-items: flex-start; justify-content: center; padding-top: 10vh; }
@@ -171,8 +195,10 @@
         .gb-ex { color: #888; font-family: monospace; font-size: 12px; margin-left: 8px; }
         .gb-test { background: #eef3ff; border: 1px solid #cdd9f5; padding: 6px 8px; border-radius: 4px; margin-top: 6px; font-size: 13px; }
         .gb-test code { background: #fff; padding: 1px 4px; border: 1px solid #ddd; }
-        #saveBar { position: sticky; bottom: 0; z-index: 1000; background: #fff; border-top: 1px solid #ddd;
-            padding: 12px 0; margin-top: 8px; }
+        /* .main (the scrolling box) has 25px padding at the bottom: without the
+           negative offset the bar stops above it and content shows underneath */
+        #saveBar { position: sticky; bottom: -25px; z-index: 1000; background: #fff; border-top: 1px solid #ddd;
+            padding: 12px 0 37px; margin-top: 8px; margin-bottom: -25px; }
         #saveMsg { margin-left: 12px; }
     </style>
 </head>
@@ -417,7 +443,7 @@
     var initialGrid = ws.getAttribute("data-grid") || "";
 
     var $ = function (sel) { return document.querySelector(sel); };
-    var mapApi = null, tplApi = null;
+    var mapApi = null, tplApi = null, formApi = null;
 
     // Tell the column manager which columns the template needs (its {"attr":"…"} keys),
     // so it can offer to add the missing ones.
@@ -575,17 +601,21 @@
 
     // ---------- ③ template: lazy-init on first open ----------
     var tplSection = document.getElementById("tplSection");
+    var tplWaiting = null;   // callbacks while the template is loading (it loads once)
     function initTpl(cb) {
         if (tplApi) { if (cb) { cb(); } return; }
+        if (tplWaiting) { if (cb) { tplWaiting.push(cb); } return; }
+        tplWaiting = cb ? [cb] : [];
         var done = function (txt) {
-            var formApi = null;
             tplApi = TemplateEditor.init({ initialText: txt || "", onChange: function () {
                 updateSuggested();
                 if (formApi) { formApi.refresh(); }
             } });
             formApi = TemplateForm.init({ container: document.getElementById("tplForm"),
                 getText: tplApi.getText, setText: tplApi.setText });
-            if (cb) { cb(); }
+            var waiting = tplWaiting;
+            tplWaiting = null;
+            waiting.forEach(function (f) { f(); });
         };
         if (mode !== "new" && initialGrid) {
             fetch("/admin/series/template/data?grid=" + encodeURIComponent(initialGrid))
@@ -595,6 +625,28 @@
         } else { done(""); }
     }
     tplSection.addEventListener("toggle", function () { if (tplSection.open) { initTpl(); } });
+
+    // A value the cataloguer used that the template lacks ("Přidat do šablony" in
+    // the catalogue): prepare it as a row of the template form, to check and save.
+    (function () {
+        var KEY = "mapseries.templateAddition", add = null;
+        try { add = JSON.parse(localStorage.getItem(KEY)); } catch (e) { return; }
+        if (!add || mode === "new" || add.grid !== initialGrid || Date.now() - add.created > 24 * 3600 * 1000) { return; }
+        localStorage.removeItem(KEY);
+        tplSection.open = true;
+        initTpl(function () {
+            var done = formApi.prefill(add);
+            var banner = document.createElement("div");
+            banner.className = "tf-banner";
+            banner.textContent = done
+                ? "Z katalogizace" + (add.sheet ? " listu " + add.sheet : "") + ": " + done +
+                  " (označený zeleně). Zkontrolujte ho, doplňte chybějící hodnoty a uložte tlačítkem „Uložit sérii“."
+                : "Návrh z katalogu se do této šablony nepodařilo vložit.";
+            var form = document.getElementById("tplForm");
+            form.insertBefore(banner, form.firstChild);
+            tplSection.scrollIntoView({ block: "start" });
+        });
+    })();
     document.querySelectorAll(".tpl-tabs button").forEach(function (tab) {
         tab.addEventListener("click", function () {
             document.querySelectorAll(".tpl-tabs button").forEach(function (b) {

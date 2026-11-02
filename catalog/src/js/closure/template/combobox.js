@@ -201,6 +201,7 @@ ms.ComboBox.prototype.setAuthorityResults_ = function(results) {
     }
   }, this);
   this.authorityItems_ = [];
+  goog.dom.classlist.remove(this.getMenu().getElement(), 'has-authority');
   if (!results) {
     return;
   }
@@ -217,6 +218,7 @@ ms.ComboBox.prototype.setAuthorityResults_ = function(results) {
     this.addAuthorityItem_(item, record);
   }, this);
 
+  goog.dom.classlist.add(this.getMenu().getElement(), 'has-authority');
   if (document.activeElement == this.getInputElement()) {
     this.maybeShowMenu_(false);
     this.positionMenu();

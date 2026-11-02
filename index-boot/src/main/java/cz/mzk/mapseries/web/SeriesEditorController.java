@@ -89,22 +89,29 @@ public class SeriesEditorController {
         return "admin/series-workspace";
     }
 
-    /** Edit-series workspace (same page as new; prefilled; grid/template loaded via AJAX). */
+    /** Edit-series workspace (same page as new; prefilled; grid/template loaded via AJAX).
+     *  Opened by name from the list, or by grid from the catalogue ("Přidat do šablony"). */
     @GetMapping("/admin/series/edit")
-    public String editSeries(@RequestParam String name, @RequestParam(required = false) String code,
-                             Model model, HttpServletRequest request) {
+    public String editSeries(@RequestParam(required = false) String name, @RequestParam(required = false) String grid,
+                             @RequestParam(required = false) String code, Model model, HttpServletRequest request) {
         if (code != null && !code.isBlank()) {
             authService.authenticate(code);
-            return "redirect:/admin/series/edit?name=" + enc(name);
+            // GitHub returns without the original query: back to the list then
+            // (it forwards a pending "Přidat do šablony" to the right series)
+            return name != null ? "redirect:/admin/series/edit?name=" + enc(name)
+                    : grid != null ? "redirect:/admin/series/edit?grid=" + enc(grid)
+                    : "redirect:/admin/series";
         }
         if (!gate(model, request)) {
             return "admin/series-workspace";
         }
-        JSONObject item = findByName(readContentDefinition(), name);
+        List<JSONObject> items = readContentDefinition();
+        JSONObject item = name != null ? findByName(items, name) : findByGrid(items, grid);
         if (item == null) {
-            model.addAttribute("error", "Série \"" + name + "\" nebyla nalezena.");
+            model.addAttribute("error", "Série \"" + (name != null ? name : grid) + "\" nebyla nalezena.");
             return "admin/series-workspace";
         }
+        name = item.getString("name");
         model.addAttribute("mode", "edit");
         model.addAttribute("originalName", name);
         model.addAttribute("prettyName", prettyName(item.getString("name")));
@@ -332,6 +339,13 @@ public class SeriesEditorController {
                     if (token != null && !token.isBlank()) { h.setBearerAuth(token); }
                 })
                 .retrieve().body(String.class);
+    }
+
+    private static JSONObject findByGrid(List<JSONObject> items, String grid) {
+        if (grid == null) {
+            return null;
+        }
+        return items.stream().filter(o -> grid.equals(o.optString("grid", ""))).findFirst().orElse(null);
     }
 
     private static JSONObject findByName(List<JSONObject> items, String name) {

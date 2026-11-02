@@ -66,6 +66,18 @@
 </div>
 
 <script>window.admin.main()</script>
+<script th:if="${admin}">
+// A template addition prepared in the catalogue ("Přidat do šablony") survives
+// the GitHub login, which returns here: go on to its series.
+(function () {
+    try {
+        var add = JSON.parse(localStorage.getItem("mapseries.templateAddition"));
+        if (add && add.grid && Date.now() - add.created < 24 * 3600 * 1000) {
+            location.href = "/admin/series/edit?grid=" + encodeURIComponent(add.grid);
+        }
+    } catch (e) { /* nothing pending */ }
+})();
+</script>
 
 </body>
 </html>
