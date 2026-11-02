@@ -194,7 +194,7 @@ window.TemplateForm = (function () {
         var items = values.map(function (v) { return JSON.stringify(v); });
         var mi = original.match(/\n([ \t]*)\S/);
         if (!mi || !items.length) {
-            return "[" + items.join(/",\S/.test(original) ? "," : ", ") + "]";
+            return "[" + items.join(/", "/.test(original) || !/","/.test(original) ? ", " : ",") + "]";
         }
         var mc = original.match(/\n([ \t]*)\]$/);
         return "[\n" + items.map(function (it) { return mi[1] + it; }).join(",\n") +
@@ -663,6 +663,14 @@ window.TemplateForm = (function () {
             };
             if (btn.classList.contains("tf-add")) {
                 var add = function (rec) {
+                    // a corporation already in the table (same $7) is not added twice
+                    var codeCol = t.cols.filter(function (c) { return c.kind === "code"; })[0];
+                    var existing = rec && rec.code && codeCol ? codeCol.block.obj.valuesByBaseIndex.indexOf(rec.code) : -1;
+                    if (existing >= 0) {
+                        flash(rowsOf(ti)[existing], true);
+                        alert("Tato korporace už v šabloně je (řádek " + (existing + 1) + ").");
+                        return;
+                    }
                     var changed = everything(pad(t));
                     all().forEach(function (arr) { arr.push(""); });
                     if (rec) { applyBase(t, t.base.obj.values.length - 1, rec); }

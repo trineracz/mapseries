@@ -3,6 +3,7 @@
 #   ./editor-tests.sh roundtrip   # all templates: rewriting keeps the text (node, no app needed)
 #   ./editor-tests.sh form        # editor page: layout (save bar, no sideways scroll), swap animation
 #   ./editor-tests.sh e2e         # catalogue on :8080 -> addition -> editor page gets the row
+#   SESSION=<JSESSIONID> ./editor-tests.sh real   # the real admin page (app with MAPSERIES_EDITOR_DRY_RUN=true!)
 # Needs: ../../../mapseries-data with remote "upstream" (templates, geojson), the app on :8080
 # for form/e2e (assets, /api/authorities), python3 with bs4. Output: out/ (screenshots, texts).
 set -e
@@ -17,5 +18,5 @@ if [ "$1" = roundtrip ]; then
   exec node roundtrip.cjs "$REPO/index-boot/src/main/resources/static/assets/series-editor/template-form.js" out/tpl
 fi
 python3 render.py "$GRID" out/index.html
-docker run --rm --ipc=host -v "$PWD/..":/work -v "$REPO":/src:ro -w /work \
+docker run --rm --ipc=host -e SESSION -e GRID -v "$PWD/..":/work -v "$REPO":/src:ro -w /work \
   mcr.microsoft.com/playwright:v1.48.2-jammy bash -c "npm install --silent >/dev/null && node editor/$1.mjs"
