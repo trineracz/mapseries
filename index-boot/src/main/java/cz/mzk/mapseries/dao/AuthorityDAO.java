@@ -25,6 +25,10 @@ public class AuthorityDAO {
     @Column(length = 3)
     private String tag;
 
+    /** First indicator of the heading, e.g. 1 = jurisdiction name, 2 = name in direct order (110). */
+    @Column(length = 1)
+    private String ind1;
+
     /** Heading for display, e.g. "Rakousko-Uhersko. Militärgeographisches Institut". */
     @Column(columnDefinition = "text")
     private String heading;
@@ -51,6 +55,10 @@ public class AuthorityDAO {
 
     public String getTag() {
         return tag;
+    }
+
+    public String getInd1() {
+        return ind1;
     }
 
     public String getHeading() {

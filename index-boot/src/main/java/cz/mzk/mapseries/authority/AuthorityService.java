@@ -38,7 +38,7 @@ public class AuthorityService {
     private static final Logger LOG = LoggerFactory.getLogger(AuthorityService.class);
     private static final int BATCH = 1000;
     private static final String INSERT = "INSERT INTO authoritydao "
-            + "(code, tag, heading, marc, variants, norm, search) VALUES (?, ?, ?, ?, ?, ?, ?) "
+            + "(code, tag, ind1, heading, marc, variants, norm, search) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
             + "ON CONFLICT (code) DO NOTHING";
 
     private final JdbcTemplate jdbc;
@@ -76,7 +76,7 @@ public class AuthorityService {
             return List.of();
         }
         List<Object> args = new ArrayList<>();
-        StringBuilder sql = new StringBuilder("SELECT code, tag, heading, marc, variants FROM authoritydao WHERE 1=1");
+        StringBuilder sql = new StringBuilder("SELECT code, tag, ind1, heading, marc, variants FROM authoritydao WHERE 1=1");
         if (tags != null && !tags.isEmpty()) {
             sql.append(" AND tag IN (").append(String.join(",", tags.stream().map(t -> "?").toList())).append(")");
             args.addAll(tags);
@@ -92,6 +92,7 @@ public class AuthorityService {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("code", rs.getString("code"));
             row.put("tag", rs.getString("tag"));
+            row.put("ind1", rs.getString("ind1"));
             row.put("heading", rs.getString("heading"));
             row.put("marc", rs.getString("marc"));
             String variants = rs.getString("variants");
@@ -167,7 +168,7 @@ public class AuthorityService {
                 String variants = String.join(" | ", a.variants());
                 String norm = normalize(a.heading());
                 String search = a.variants().isEmpty() ? norm : norm + " | " + normalize(variants);
-                batch.add(new Object[] {a.code(), a.tag(), a.heading(), a.marc(), variants, norm, search});
+                batch.add(new Object[] {a.code(), a.tag(), a.ind1(), a.heading(), a.marc(), variants, norm, search});
                 if (batch.size() >= BATCH) {
                     flush(batch);
                 }

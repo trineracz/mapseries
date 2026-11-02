@@ -290,6 +290,17 @@ ms.Template.prototype.createComboBox_ = function (json, series, map, block) {
   cb.base = base || null;
   cb.fieldIdx = block ? block.field : -1;
   cb.editable = !!(cb.base && cb.valuesByBaseIndex && block && block.editable);
+  if (block) {
+    cb.tag = block.tag;
+    cb.subfield = block.subfield;
+    cb.offset = block.offset;
+  }
+  // the corporation (110) and the related corporations (710) are looked up in
+  // the authority file
+  if (block && block.subfield === 'a' &&
+      ((block.tag === '110' && cb.id && !cb.base) || (block.tag === '710' && cb.editable))) {
+    cb.authorityType = 'corporation';
+  }
 
   this.fields.push(cb);
 
@@ -335,7 +346,8 @@ ms.Template.prototype.initComboBoxes_ = function (sheet, series, map) {
     var idx = parseInt(div.id.substr(16), 10);
     var cb = this.fields[idx];
 
-    var caption = new goog.ui.ComboBoxItem(languages.getText('input-hint'));
+    var caption = new goog.ui.ComboBoxItem(
+      languages.getText(cb.authorityType ? 'authority-hint' : 'input-hint'));
     caption.setSticky(true);
     caption.setEnabled(false);
     cb.addItemAt(caption, 0);
@@ -484,7 +496,256 @@ ms.Template.prototype.initComboBoxes_ = function (sheet, series, map) {
     }
   }, this);
 
+  this.initAuthorityFields_(sheet);
 
+};
+
+
+/**
+ * Fields whose value is an identity: a heading paired with its authority code
+ * ($7) — the corporation (110) and the related corporations (710) — and the
+ * coded data of 008 that follows the corporation. Their values come from the
+ * template or the authority file and are only picked, never typed: in 110 and
+ * 710 typing searches the authority file, and text that is neither a template
+ * value nor a picked authority is reverted when the field is left.
+ * @param {OpenLayers.Feature.Vector} sheet sheet.
+ * @private
+ */
+ms.Template.prototype.initAuthorityFields_ = function (sheet) {
+  goog.array.forEach(this.fields, function (cb) {
+    if (!cb.authorityType) {
+      return;
+    }
+    if (cb.base) {
+      this.initRelatedCorporation_(cb, sheet);
+    } else {
+      this.initCorporation_(cb, sheet);
+    }
+  }, this);
+};
+
+
+/**
+ * The corporation (110), the base of most linked fields.
+ * @param {ms.ComboBox} cb combo box.
+ * @param {OpenLayers.Feature.Vector} sheet sheet.
+ * @private
+ */
+ms.Template.prototype.initCorporation_ = function (cb, sheet) {
+  var dependent = this.getDependent_(cb);
+  var codeField = goog.array.find(dependent, function (dep) {
+    return dep.fieldIdx === cb.fieldIdx && dep.subfield === '7' && dep.valuesByBaseIndex;
+  });
+  var codedFields = goog.array.filter(dependent, function (dep) {
+    return dep.tag === '008' && dep.valuesByBaseIndex && !dep.editable;
+  });
+
+  // menu index of the template value, -1 if it is not one
+  var templateIndex = function (value) {
+    var highlighted = cb.getMenu().getHighlighted();
+    if (highlighted && !goog.isDef(highlighted.authority) && highlighted.getCaption() === value) {
+      return cb.getMenu().getHighlightedIndex();
+    }
+    for (var i = 0; i < cb.getItemCount(); i++) {
+      var item = cb.getItemAt(i);
+      if (item.isEnabled() && !goog.isDef(item.authority) && item.getCaption() === value) {
+        return i;
+      }
+    }
+    return -1;
+  };
+
+  var resolve = function () {
+    var value = cb.getValue();
+    if (value === '') {
+      return { value: value, index: -1, authority: null };
+    }
+    var index = templateIndex(value);
+    return index >= 0 ? { value: value, index: index, authority: null } : null;
+  };
+
+  this.makeSelectOnly_(cb, resolve, function (state) {
+    cb.authority = state.authority;
+    cb.pickValue(state.value, state.index);
+  }, function () {
+    return { value: cb.getValue(), index: templateIndex(cb.getValue()), authority: cb.authority };
+  });
+
+  // a corporation the template knows (same $7 code) is picked as the template
+  // value, so that all linked fields follow it as before
+  cb.onAuthority = function (record) {
+    var index = -1;
+    if (codeField) {
+      for (var i = 0; i < codeField.valuesByBaseIndex.length && index < 0; i++) {
+        if (goog.array.indexOf(codeField.valueForBaseIndex(i, sheet), record['code']) >= 0) {
+          index = i + 1;
+        }
+      }
+    }
+    if (index > 0 && cb.getItemAt(index)) {
+      cb.authority = null;
+      cb.pickValue(cb.getItemAt(index).getCaption(), index);
+    } else {
+      cb.authority = record;
+      cb.pickValue(record['marc'], -1);
+    }
+  };
+
+  // the codes of 008 keep their value for a corporation the template does not
+  // know and can be changed to another value of the template
+  goog.events.listen(cb, 'change', function () {
+    goog.array.forEach(codedFields, function (dep) {
+      this.setCodedFieldEnabled_(dep, !!cb.authority, sheet);
+    }, this);
+  }, false, this);
+};
+
+
+/**
+ * Unlock (or lock again) a coded field of 008 linked to the corporation; when
+ * unlocked it offers the values of the template and accepts nothing else.
+ * @param {ms.ComboBox} dep combo box.
+ * @param {boolean} enabled whether to unlock it.
+ * @param {OpenLayers.Feature.Vector} sheet sheet.
+ * @private
+ */
+ms.Template.prototype.setCodedFieldEnabled_ = function (dep, enabled, sheet) {
+  if (enabled && !dep.codedOptions_) {
+    dep.codedOptions_ = dep.getBaseOptions(sheet);
+    goog.array.forEach(dep.codedOptions_, function (option) {
+      dep.addItem(new goog.ui.ComboBoxItem(option));
+    });
+    goog.dom.classlist.remove(dep.getElement(), 'no-arrow');
+    this.makeSelectOnly_(dep, function () {
+      var value = dep.getValue();
+      return goog.array.indexOf(dep.codedOptions_, value) >= 0 ? value : null;
+    }, function (value) {
+      dep.pickValue(value, -1);
+    }, function () {
+      return dep.getValue();
+    });
+  }
+  dep.setEnabled(enabled);
+  goog.dom.classlist.enable(dep.getElement().parentNode, 'disabled', !enabled);
+};
+
+
+/**
+ * A related corporation (710): a template value or one picked from the
+ * authority file; only its relator ($$4) can be rewritten.
+ * @param {ms.ComboBox} cb combo box.
+ * @param {OpenLayers.Feature.Vector} sheet sheet.
+ * @private
+ */
+ms.Template.prototype.initRelatedCorporation_ = function (cb, sheet) {
+  // the heading and its code, without the relators
+  var identity = function (value) {
+    return goog.string.trim(value.replace(/\$\$4[^$]*/g, ''));
+  };
+  var options = cb.getBaseOptions(sheet);
+  var allowed = goog.array.map(options, identity);
+  allowed.push('');
+
+  var indicators = goog.array.filter(this.fields, function (other) {
+    return other !== cb && other.base === cb.base && !other.editable &&
+      other.fieldIdx === cb.fieldIdx && other.offset === 3 && other.valuesByBaseIndex;
+  });
+
+  this.makeSelectOnly_(cb, function () {
+    var value = cb.getValue();
+    return goog.array.indexOf(allowed, identity(value)) >= 0 ? value : null;
+  }, function (value) {
+    cb.pickValue(value, -1);
+  }, function () {
+    return cb.getValue();
+  });
+
+  cb.onAuthority = function (record) {
+    var code = '$$7' + record['code'];
+    var value = goog.array.find(options, function (option) {
+      return option.indexOf(code) >= 0;
+    });
+    if (!value) {
+      // keep the relator of the current value (or the template's one)
+      var relators = cb.getValue().match(/\$\$4[^$]*/g);
+      for (var i = 0; !relators && i < options.length; i++) {
+        relators = options[i].match(/\$\$4[^$]*/g);
+      }
+      value = record['marc'] + (relators || []).join('') + code;
+      goog.array.forEach(indicators, function (ind) {
+        ind.getInputElement().value = record['ind1'] || '2';
+      });
+    }
+    allowed.push(identity(value));
+    cb.pickValue(value, -1);
+  };
+};
+
+
+/**
+ * Make a combo box accept only valid values: when it is left after typing,
+ * a valid value is applied again (so that linked fields follow it) and any
+ * other text is replaced by the last valid value.
+ * @param {ms.ComboBox} cb combo box.
+ * @param {function(): *} resolve the state of a valid current value, or null.
+ * @param {function(*)} restore apply a state.
+ * @param {function(): *} current the state of the current value.
+ * @private
+ */
+ms.Template.prototype.makeSelectOnly_ = function (cb, resolve, restore, current) {
+  var input = cb.getInputElement();
+  var typed = false;
+  var last = current();
+  goog.events.listen(input, 'beforeinput', function () {
+    typed = true;
+  });
+  // picked from the menu (the template values or the authority file)
+  goog.events.listen(cb, 'action', function () {
+    typed = false;
+  });
+  goog.events.listen(cb, 'change', function () {
+    if (!typed) {
+      last = current();
+    }
+  });
+  goog.events.listen(input, 'blur', function () {
+    if (!typed) {
+      return;
+    }
+    typed = false;
+    var state = resolve();
+    if (state !== null) {
+      restore(state);
+    } else {
+      restore(last);
+      ms.Template.showNotice_(cb, languages.getText('authority-only'));
+    }
+  });
+};
+
+
+/**
+ * Show a short notice under a combo box.
+ * @param {ms.ComboBox} cb combo box.
+ * @param {string} text text.
+ * @private
+ */
+ms.Template.showNotice_ = function (cb, text) {
+  var el = cb.getElement();
+  var old = document.querySelector('.combo-notice');
+  if (old) {
+    old.remove();
+  }
+  var rect = el.getBoundingClientRect();
+  var notice = goog.dom.createDom('div', 'combo-notice', text);
+  notice.style.left = rect.left + 'px';
+  notice.style.top = rect.bottom + 2 + 'px';
+  document.body.appendChild(notice);
+  goog.dom.classlist.add(el, 'combo-reverted');
+  setTimeout(function () {
+    notice.remove();
+    goog.dom.classlist.remove(el, 'combo-reverted');
+  }, 4000);
 };
 
 
@@ -589,21 +850,23 @@ ms.Template.prototype.getDependent_ = function (mainCb) {
 
 /**
  * Fields linked to a base that stay editable by default: the subfields of the
- * added entries (710) and the statement of responsibility (245 $c) — catalogers
- * need to adjust them per sheet. Indicators stay locked and follow the chosen
- * value. A template can override it with "editable": true/false.
+ * added entries (710), the statement of responsibility (245 $c) and the place
+ * and publisher (260/264) — catalogers need to adjust them per sheet, the
+ * last two are transcribed from the map. Indicators stay locked and follow
+ * the chosen value. A template can override it with "editable": true/false.
  * @type {Array.<string>}
  * @private
  */
-ms.Template.EDITABLE_LINKED_TAGS_ = ['245', '710'];
+ms.Template.EDITABLE_LINKED_TAGS_ = ['245', '260', '264', '710'];
 
 
 /**
  * Describe every JSON block of the template, in template order: whether it is
- * linked to a base, the MARC field (line) it belongs to and its tag, and
- * whether it is editable.
+ * linked to a base, the MARC field (line) it belongs to and its tag, whether
+ * it is editable, the subfield it fills and its position in the field.
  * @param {string} template template string.
- * @return {Array.<{base: boolean, field: number, tag: string, editable: boolean}>}
+ * @return {Array.<{base: boolean, field: number, tag: string, editable: boolean,
+ *     subfield: string, offset: number}>}
  * @private
  */
 ms.Template.prototype.describeBlocks_ = function (template) {
@@ -627,11 +890,17 @@ ms.Template.prototype.describeBlocks_ = function (template) {
     }
     var tag = field >= 0 ? template.substr(fieldStarts[field], 3) : '';
     var base = !!b.json['base'];
+    var before = field >= 0 ? template.substring(fieldStarts[field], b.start) : '';
+    var marker = before.lastIndexOf('$$');
     // only subfield values ($$...), never indicators, are editable by default
-    var inSubfield = field >= 0 && template.substring(fieldStarts[field], b.start).indexOf('$$') >= 0;
+    var inSubfield = marker >= 0;
     var editable = goog.isDef(b.json['editable']) ? !!b.json['editable'] :
       inSubfield && goog.array.indexOf(ms.Template.EDITABLE_LINKED_TAGS_, tag) >= 0;
-    return { base: base, field: field, tag: tag, editable: base && editable };
+    return {
+      base: base, field: field, tag: tag, editable: base && editable,
+      subfield: inSubfield ? before.charAt(marker + 2) : '',
+      offset: field >= 0 ? before.length : -1
+    };
   });
 };
 

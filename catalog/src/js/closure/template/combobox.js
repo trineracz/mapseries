@@ -4,6 +4,7 @@ import '../latlng';
 import './valueitem';
 
 import mapboxgl from 'mapbox-gl'
+import languages from 'languages'
 
 
 /**
@@ -76,8 +77,204 @@ ms.ComboBox = function() {
    */
   this.fieldIdx = -1;
 
+  /**
+   * MARC tag of the field the combo box is in.
+   * @type {string}
+   */
+  this.tag = '';
+
+  /**
+   * Subfield code the combo box fills ('' outside subfields, e.g. indicators).
+   * @type {string}
+   */
+  this.subfield = '';
+
+  /**
+   * Position of the combo box from the start of its MARC field
+   * (3 = first indicator).
+   * @type {number}
+   */
+  this.offset = -1;
+
+  /**
+   * Kind of authorities typed text is looked up in (e.g. 'corporation'),
+   * or null when the combo box does not search the authority file.
+   * @type {?string}
+   */
+  this.authorityType = null;
+
+  /**
+   * Called with the authority record the user picked from the search results.
+   * @type {?function(Object)}
+   */
+  this.onAuthority = null;
+
+  /**
+   * Authority record that is the current value although the template does
+   * not know it (its linked fields follow the record, not a template position).
+   * @type {Object}
+   */
+  this.authority = null;
+
+  /** @private {Array.<goog.ui.ComboBoxItem>} menu items of the search results */
+  this.authorityItems_ = [];
+
+  /** @private {?number} */
+  this.searchTimer_ = null;
+
+  /** @private {number} number of the latest search (older answers are dropped) */
+  this.searchSeq_ = 0;
+
 };
 goog.inherits(ms.ComboBox, goog.ui.ComboBox);
+
+
+/**
+ * How long to wait after the last keystroke before searching (ms).
+ * @type {number}
+ */
+ms.ComboBox.SEARCH_DELAY = 250;
+
+
+/**
+ * How many authorities to offer.
+ * @type {number}
+ */
+ms.ComboBox.SEARCH_LIMIT = 10;
+
+
+/**
+ * Typing makes the value free text again, and in a combo box searching the
+ * authority file it also looks the text up.
+ * @override
+ */
+ms.ComboBox.prototype.handleInputChange_ = function() {
+  this.authority = null;
+  goog.ui.ComboBox.prototype.handleInputChange_.call(this);
+  if (this.authorityType && document.activeElement == this.getInputElement()) {
+    this.scheduleAuthoritySearch_();
+  }
+};
+
+
+/**
+ * Search the authority file for the typed text a moment after the last
+ * keystroke and offer the results below the template values.
+ * @private
+ */
+ms.ComboBox.prototype.scheduleAuthoritySearch_ = function() {
+  clearTimeout(this.searchTimer_);
+  var seq = ++this.searchSeq_;
+  // only the name is searched, not the subfields after it ($$4 role, $$7 code)
+  var query = goog.string.trim(this.getValue().split('$$')[0]);
+  if (query.length < 2) {
+    this.setAuthorityResults_(null);
+    return;
+  }
+  var _this = this;
+  this.searchTimer_ = setTimeout(function() {
+    var params = new URLSearchParams({
+      'q': query, 'type': _this.authorityType, 'limit': String(ms.ComboBox.SEARCH_LIMIT)
+    });
+    fetch('/api/authorities?' + params)
+      .then(function(response) { return response.ok ? response.json() : null; })
+      .then(function(results) {
+        if (seq == _this.searchSeq_) {
+          _this.setAuthorityResults_(results);
+        }
+      })
+      .catch(function() {});
+  }, ms.ComboBox.SEARCH_DELAY);
+};
+
+
+/**
+ * Replace the offered search results.
+ * @param {Array.<Object>} results authority records, or null for none.
+ * @private
+ */
+ms.ComboBox.prototype.setAuthorityResults_ = function(results) {
+  goog.array.forEach(this.authorityItems_, function(item) {
+    var index = this.getMenu().indexOfChild(item);
+    if (index >= 0) {
+      this.removeItemAt(index);
+    }
+  }, this);
+  this.authorityItems_ = [];
+  if (!results) {
+    return;
+  }
+
+  var header = new goog.ui.ComboBoxItem(languages.getText(
+      results.length ? 'authority-results' : 'authority-none'));
+  header.setEnabled(false);
+  this.addAuthorityItem_(header, null);
+  goog.array.forEach(results, function(record) {
+    var item = new goog.ui.ComboBoxItem([
+      document.createTextNode(record['heading']),
+      goog.dom.createDom('span', 'authority-code', record['code'])
+    ]);
+    this.addAuthorityItem_(item, record);
+  }, this);
+
+  if (document.activeElement == this.getInputElement()) {
+    this.maybeShowMenu_(false);
+    this.positionMenu();
+  }
+};
+
+
+/**
+ * @param {goog.ui.ComboBoxItem} item menu item.
+ * @param {Object} record authority record (null for the header).
+ * @private
+ */
+ms.ComboBox.prototype.addAuthorityItem_ = function(item, record) {
+  item.authority = record;
+  // always shown (the server already matched it) and never reformatted
+  item.setSticky(true);
+  item.setFormatFromToken = function() {};
+  item.createDom();
+  goog.dom.classlist.add(item.getElement(), record ? 'authority-item' : 'authority-header');
+  this.addItem(item);
+  this.authorityItems_.push(item);
+};
+
+
+/**
+ * A picked search result is handed over to onAuthority instead of its
+ * caption becoming the value.
+ * @override
+ */
+ms.ComboBox.prototype.onMenuSelected_ = function(e) {
+  var item = e.target;
+  if (!goog.isDef(item.authority)) {
+    goog.ui.ComboBox.prototype.onMenuSelected_.call(this, e);
+    return;
+  }
+  e.stopPropagation();
+  var record = item.authority;
+  this.dismiss();
+  this.setAuthorityResults_(null);
+  if (record && this.onAuthority) {
+    this.onAuthority(record);
+  }
+};
+
+
+/**
+ * Make the given text the value as if it was picked from the menu (the menu
+ * item at the given index is highlighted, so linked fields follow it).
+ * @param {string} value value.
+ * @param {number} index menu index, -1 for none.
+ */
+ms.ComboBox.prototype.pickValue = function(value, index) {
+  this.dispatchEvent('action');
+  this.getMenu().setHighlightedIndex(index);
+  this.setLabelInputValue_(value);
+  this.dispatchEvent('change');
+  this.getMenu().setHighlightedIndex(-1);
+};
 
 
 /**
@@ -211,7 +408,9 @@ ms.ComboBox.getValues_ = function(value, sheet, baseValue) {
  * @return {Array.<string>} formatted value(s).
  */
 ms.ComboBox.prototype.formatValue = function(value, sheet) {
-  if (this.valuesByBaseIndex && this.base) {
+  if (this.valuesByBaseIndex && this.base && this.base.authority) {
+    results = this.valueForAuthority_(this.base.authority, sheet);
+  } else if (this.valuesByBaseIndex && this.base) {
     var bid = this.base.getMenu().getHighlightedIndex();
     if (bid > 0) {
       var valueItem = this.valuesByBaseIndex[bid - 1] || '';
@@ -222,6 +421,33 @@ ms.ComboBox.prototype.formatValue = function(value, sheet) {
   }
   results = results || [''];
   return results;
+};
+
+
+/**
+ * Value of a combo box linked to a base whose value is an authority record
+ * the template does not know: the record's code ($7) and indicator in the
+ * base's own MARC field; the coded data of 008 stays as it was, or gets the
+ * template's first value (the field has fixed positions); everything else is
+ * left for the cataloger to fill in.
+ * @param {Object} record authority record.
+ * @param {OpenLayers.Feature.Vector} sheet sheet.
+ * @return {Array.<string>} value.
+ * @private
+ */
+ms.ComboBox.prototype.valueForAuthority_ = function(record, sheet) {
+  if (this.fieldIdx === this.base.fieldIdx) {
+    if (this.subfield === '7') {
+      return [record['code']];
+    }
+    if (this.offset === 3) {
+      return [record['ind1'] || '2'];
+    }
+  }
+  if (this.tag === '008') {
+    return [this.getInputElement().value || this.getBaseOptions(sheet)[0] || ''];
+  }
+  return [''];
 };
 
 

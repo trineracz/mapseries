@@ -82,5 +82,21 @@ export default {
   "input-hint": {
     "cs": "Vybrat nebo napsat hodnotu...",
     "en": "Select or type another value..."
+  },
+  "authority-hint": {
+    "cs": "Vybrat hodnotu nebo napsat část názvu a vybrat z Národních autorit ČR...",
+    "en": "Select a value or type a part of the name to choose from the Czech National Authority File..."
+  },
+  "authority-results": {
+    "cs": "Národní autority ČR:",
+    "en": "Czech National Authority File:"
+  },
+  "authority-none": {
+    "cs": "V Národních autoritách ČR nic nenalezeno",
+    "en": "Nothing found in the Czech National Authority File"
+  },
+  "authority-only": {
+    "cs": "Hodnotu nelze napsat ručně – vyberte ji ze šablony nebo z Národních autorit ČR (napište část názvu).",
+    "en": "The value cannot be typed in – choose it from the template or from the Czech National Authority File (type a part of the name)."
   }
 }

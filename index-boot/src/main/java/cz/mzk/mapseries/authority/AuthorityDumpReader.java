@@ -20,10 +20,10 @@ import javax.xml.stream.XMLStreamReader;
 public class AuthorityDumpReader {
 
     /** One authority record, reduced to what the catalog needs. */
-    public record Authority(String code, String tag, String heading, String marc, List<String> variants) {
+    public record Authority(String code, String tag, String ind1, String heading, String marc, List<String> variants) {
     }
 
-    private record Field(String tag, List<String[]> subfields) {
+    private record Field(String tag, String ind1, List<String[]> subfields) {
     }
 
     private final Set<String> tags;
@@ -62,7 +62,8 @@ public class AuthorityDumpReader {
                             controlTag = xml.getAttributeValue(null, "tag");
                             text.setLength(0);
                         }
-                        case "datafield" -> field = new Field(xml.getAttributeValue(null, "tag"), new ArrayList<>());
+                        case "datafield" -> field = new Field(xml.getAttributeValue(null, "tag"),
+                                xml.getAttributeValue(null, "ind1"), new ArrayList<>());
                         case "subfield" -> {
                             subfieldCode = xml.getAttributeValue(null, "code");
                             text.setLength(0);
@@ -137,7 +138,8 @@ public class AuthorityDumpReader {
                 }
             }
         }
-        return new Authority(code, heading.tag(), display, join(heading, true), new ArrayList<>(variants));
+        String ind1 = heading.ind1() == null ? "" : heading.ind1().trim();
+        return new Authority(code, heading.tag(), ind1, display, join(heading, true), new ArrayList<>(variants));
     }
 
     /**
