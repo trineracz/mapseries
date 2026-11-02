@@ -155,5 +155,39 @@ await in264.fill('Berlin :$$bReichsamt für Landesaufnahme,');
 await page.locator('.template-dialog-title').click();
 await show('264 typed');
 
+// 7. the check of the copied record
+async function check(label) {
+  await page.locator('#clipboard_button').click();
+  const box = await page.evaluate(() => {
+    const el = document.querySelector('.copy-check');
+    return el ? el.innerText : null;
+  });
+  const marked = await page.evaluate(() => [...document.querySelectorAll('.combo-problem')].map(d => d.title));
+  console.log(`\n== check: ${label}\n  ${(box || '(none)').replace(/\n/g, '\n  ')}\n  marked: ${JSON.stringify(marked)}`);
+}
+async function byId(id) {
+  return page.evaluate((id) => window.__search.template.fields.findIndex(cb => cb.id === id), id);
+}
+async function typeInto(idx, text) {
+  const input = page.locator(`#templateComboBox${idx} input`);
+  await input.click();
+  await input.fill(text);
+  await page.locator('.template-dialog-title').click();
+}
+await openSheet();
+await check('default (nothing filled)');
+await page.locator(`#templateComboBox${await byId('typ_data')} .goog-combobox-button`).click();
+await page.locator(`#templateComboBox${await byId('typ_data')} .goog-menuitem`).nth(1).click();
+await typeInto(await byId('year'), '1943');
+await page.locator(`#templateComboBox${c110} .goog-combobox-button`).click();
+await page.locator(`#templateComboBox${c110} .goog-menuitem`).nth(2).click();
+for (const id of ['mapHeight', 'mapWidth', 'height', 'width']) await typeInto(await byId(id), '40');
+await check('filled in (template corporation 2)');
+await page.screenshot({ path: `${OUT}/check-ok.png` });
+await search(c110, 'vojensky zemepisny');
+await pickResult(c110, 'ko2005263855');
+await check('corporation from the authority file, not in the template');
+await page.screenshot({ path: `${OUT}/check-problems.png` });
+
 console.log('\npage errors:', errors.length ? errors : 'none');
 await browser.close();

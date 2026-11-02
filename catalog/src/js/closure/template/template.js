@@ -92,10 +92,179 @@ ms.Template.prototype.addTemplateListeners_ = function () {
 ms.Template.prototype.initClipboardHandler_ = function () {
   let clipboard = Clipboard.getInstance();
   clipboard.deregisterButtons();
-  clipboard.registerButton('clipboard_button', goog.bind(this.getTextToCopyAll_, this));
-  clipboard.registerButton('clipboard_button_008', goog.bind(this.getTextToCopyField008_, this));
-  clipboard.registerButton('clipboard_button_arl', goog.bind(this.getTextToCopyArl_, this));
+  clipboard.registerButton('clipboard_button', this.checkedCopy_(this.getTextToCopyAll_, false));
+  clipboard.registerButton('clipboard_button_008', this.checkedCopy_(this.getTextToCopyField008_, true));
+  clipboard.registerButton('clipboard_button_arl', this.checkedCopy_(this.getTextToCopyArl_, false));
 }
+
+
+/**
+ * A copy function that also checks the record and tells the cataloger what
+ * is wrong with it. The copy itself is never stopped or changed.
+ * @param {function(): string} getText the copy function.
+ * @param {boolean} only008 check only field 008.
+ * @return {function(): string} the copy function with the check.
+ * @private
+ */
+ms.Template.prototype.checkedCopy_ = function (getText, only008) {
+  var _this = this;
+  return function () {
+    var text = getText.call(_this);
+    try {
+      var problems = _this.checkRecord_(_this.getTextToCopyAll_());
+      if (only008) {
+        problems = goog.array.filter(problems, function (p) { return p.tag === '008'; });
+      }
+      _this.showCheck_(problems);
+    } catch (e) {
+      console.log('Record check failed: ' + e);
+    }
+    return text;
+  };
+};
+
+
+/**
+ * Format a text with {0}, {1}... placeholders.
+ * @param {string} key text key.
+ * @param {...string} var_args values.
+ * @return {string} text.
+ * @private
+ */
+ms.Template.text_ = function (key, var_args) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return languages.getText(key).replace(/\{(\d)\}/g, function (m, i) {
+    return args[i];
+  });
+};
+
+
+/**
+ * Find what is wrong with the record (Aleph text): only real errors, not the
+ * optional fields left empty (catalogers delete those in Aleph).
+ * @param {string} text record.
+ * @return {Array.<{tag: string, text: string, fields: Array.<ms.ComboBox>}>} problems.
+ * @private
+ */
+ms.Template.prototype.checkRecord_ = function (text) {
+  var problems = [];
+  var fields = this.fields;
+  var empty = function (pred) {
+    return goog.array.filter(fields, function (cb) {
+      return cb.getElement() && cb.getValue() === '' && pred(cb);
+    });
+  };
+  var add = function (tag, msg, problemFields) {
+    problems.push({ tag: tag, text: msg, fields: problemFields || [] });
+  };
+
+  goog.array.forEach(text.split('\n'), function (line) {
+    // "TAG" + indicators + " L " + data; an empty indicator is left out
+    // ("710  L $$a...") and some templates have a space more ("264 1  L")
+    var m = line.match(/^(\w{3})(.*?) L (.*)$/);
+    if (!m) {
+      return;
+    }
+    var tag = m[1], ind1 = m[2].length >= 2 ? m[2].charAt(0) : ' ', data = m[3];
+    // subfields: [code, value]; text before the first $$ belongs to no subfield
+    var subfields = goog.array.map(data.split('$$').slice(1), function (sf) {
+      return [sf.charAt(0), sf.substr(1)];
+    });
+    var value = function (code) {
+      var sf = goog.array.find(subfields, function (s) { return s[0] === code; });
+      return sf ? goog.string.trim(sf[1]) : null;
+    };
+
+    if (tag === '008' && data.length !== 40) {
+      var missing = empty(function (cb) { return cb.tag === '008'; });
+      var titles = [];
+      goog.array.forEach(missing, function (cb) {
+        var title = cb.configObj['title'];
+        if (title && goog.array.indexOf(titles, title) < 0) {
+          titles.push(title);
+        }
+      });
+      add('008', ms.Template.text_('check-008', data.length) +
+        (titles.length ? ' – ' + ms.Template.text_('check-008-empty', titles.join(', ')) : ''), missing);
+    } else if (tag === '110' || tag === '710') {
+      var name = value('a');
+      var own = function (cb) { return cb.tag === tag; };
+      if (!name) {
+        add(tag, tag === '110' ? ms.Template.text_('check-no-corporation') :
+          ms.Template.text_('check-empty-field', tag), empty(own));
+      } else {
+        var heading = name.replace(/\.$/, '');
+        if (!value('7')) {
+          add(tag, ms.Template.text_('check-no-code', tag, heading), empty(own));
+        }
+        if (ind1 === ' ') {
+          add(tag, ms.Template.text_('check-no-indicator', tag, heading), []);
+        }
+      }
+    } else if ((tag === '260' || tag === '264') && !value('a') && !value('b')) {
+      add(tag, ms.Template.text_('check-no-publisher', tag), empty(function (cb) {
+        return cb.tag === tag && cb.subfield !== 'c';
+      }));
+    } else if (tag === '245' && !value('a')) {
+      add(tag, ms.Template.text_('check-no-title'), empty(function (cb) {
+        return cb.tag === tag && cb.subfield === 'a';
+      }));
+    }
+  });
+
+  var dimensions = empty(function (cb) {
+    return cb.tag === '300' && goog.array.indexOf(['mapHeight', 'mapWidth', 'height', 'width'], cb.id) >= 0;
+  });
+  if (dimensions.length) {
+    add('300', ms.Template.text_('check-no-dimensions'), dimensions);
+  }
+  return problems;
+};
+
+
+/**
+ * Show the result of the check under the copy buttons and mark the fields
+ * to fix (until they are changed).
+ * @param {Array.<{tag: string, text: string, fields: Array.<ms.ComboBox>}>} problems problems.
+ * @private
+ */
+ms.Template.prototype.showCheck_ = function (problems) {
+  var container = this.getContentElement().querySelector('.clipboard-container');
+  var box = this.getContentElement().querySelector('.copy-check');
+  if (box) {
+    box.remove();
+  }
+  goog.array.forEach(this.fields, function (cb) {
+    if (cb.getElement()) {
+      goog.dom.classlist.remove(cb.getElement().parentNode, 'combo-problem');
+    }
+  });
+
+  if (!problems.length) {
+    box = goog.dom.createDom('span', 'copy-check copy-check-ok', languages.getText('check-ok'));
+    setTimeout(function () { box.remove(); }, 3000);
+  } else {
+    var list = goog.dom.createDom('ul');
+    goog.array.forEach(problems, function (p) {
+      list.appendChild(goog.dom.createDom('li', null, p.text));
+      goog.array.forEach(p.fields, function (cb) {
+        var div = cb.getElement().parentNode;
+        goog.dom.classlist.add(div, 'combo-problem');
+        if (!cb.problemListener_) {
+          cb.problemListener_ = true;
+          goog.events.listen(cb, 'change', function () {
+            goog.dom.classlist.remove(div, 'combo-problem');
+          });
+        }
+      });
+    });
+    box = goog.dom.createDom('div', 'copy-check copy-check-problems',
+      goog.dom.createDom('div', null, languages.getText('check-problems')), list);
+  }
+  // under the copy buttons; the template above gets shorter to keep it in view
+  container.appendChild(box);
+  ebus.fire('dialog-shown');
+};
 
 ms.Template.prototype.getTextToCopyAll_ = function () {
   var container = this.getContentElement();
@@ -122,7 +291,7 @@ ms.Template.prototype.getTextToCopyAll_ = function () {
         break;
     }
   }
-  return textToCopy;
+  return ms.Template.dropEmptyAddedEntries_(textToCopy);
 };
 
 ms.Template.prototype.getTextToCopyArl_ = function () {
@@ -157,6 +326,7 @@ ms.Template.prototype.getTextToCopyArl_ = function () {
         break;
     }
   }
+  textToCopy = ms.Template.dropEmptyAddedEntries_(textToCopy);
   //add space after three char in every line
   textToCopy = textToCopy.replace(/^(.{3})(\d+)/gm, "$1 $2");
   //Remove singular letter word L
@@ -164,6 +334,19 @@ ms.Template.prototype.getTextToCopyArl_ = function () {
   //Replace LDR with 000
   textToCopy = textToCopy.replace(/^LDR/g, "000");
   return textToCopy;
+};
+
+/**
+ * Leave out the added entries (7XX) left empty — a corporation without
+ * a related one ("710  L $$a"); such a field is never valid.
+ * @param {string} text record.
+ * @return {string} record.
+ * @private
+ */
+ms.Template.dropEmptyAddedEntries_ = function (text) {
+  return goog.array.filter(text.split('\n'), function (line) {
+    return !/^7\d\d.{0,3} L \$\$a\s*$/.test(line);
+  }).join('\n');
 };
 
 ms.Template.prototype.getTextToCopyField008_ = function () {
@@ -742,10 +925,16 @@ ms.Template.showNotice_ = function (cb, text) {
   notice.style.top = rect.bottom + 2 + 'px';
   document.body.appendChild(notice);
   goog.dom.classlist.add(el, 'combo-reverted');
-  setTimeout(function () {
+  var hide = function () {
     notice.remove();
     goog.dom.classlist.remove(el, 'combo-reverted');
-  }, 4000);
+  };
+  setTimeout(hide, 4000);
+  // it stays where the field was: gone as soon as the template scrolls
+  var pre = el.closest('pre');
+  if (pre) {
+    pre.addEventListener('scroll', hide, { once: true });
+  }
 };
 
 
@@ -816,6 +1005,10 @@ ms.Template.prototype.showSheet = function (sheet, series, map) {
     return;
   }
 
+  var notice = document.querySelector('.combo-notice');
+  if (notice) {
+    notice.remove();
+  }
   this.createHtmlAndComboBoxes_(template, series, map);
   this.initComboBoxes_(sheet, series, map);
 

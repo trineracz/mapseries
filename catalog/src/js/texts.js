@@ -95,6 +95,50 @@ export default {
     "cs": "V Národních autoritách ČR nic nenalezeno",
     "en": "Nothing found in the Czech National Authority File"
   },
+  "check-ok": {
+    "cs": "Zkopírováno.",
+    "en": "Copied."
+  },
+  "check-problems": {
+    "cs": "Zkopírováno, ale záznam má chyby – opravte je v šabloně (nebo v Alephu):",
+    "en": "Copied, but the record has errors – fix them in the template (or in Aleph):"
+  },
+  "check-008": {
+    "cs": "Pole 008 má {0} znaků místo 40",
+    "en": "Field 008 has {0} characters instead of 40"
+  },
+  "check-008-empty": {
+    "cs": "nevyplněno: {0}",
+    "en": "not filled in: {0}"
+  },
+  "check-no-corporation": {
+    "cs": "Není vybrána korporace (110)",
+    "en": "No corporation chosen (110)"
+  },
+  "check-empty-field": {
+    "cs": "Prázdné pole {0} – v Alephu ho smažte",
+    "en": "Empty field {0} – delete it in Aleph"
+  },
+  "check-no-code": {
+    "cs": "Pole {0} „{1}“ nemá kód autority $7",
+    "en": "Field {0} \"{1}\" has no authority code $7"
+  },
+  "check-no-indicator": {
+    "cs": "Pole {0} „{1}“ nemá indikátor",
+    "en": "Field {0} \"{1}\" has no indicator"
+  },
+  "check-no-publisher": {
+    "cs": "Chybí místo vydání a nakladatel ({0})",
+    "en": "Place of publication and publisher missing ({0})"
+  },
+  "check-no-dimensions": {
+    "cs": "Chybí rozměry mapy (300 $c)",
+    "en": "Map dimensions missing (300 $c)"
+  },
+  "check-no-title": {
+    "cs": "Chybí název listu (245 $a)",
+    "en": "Sheet title missing (245 $a)"
+  },
   "authority-only": {
     "cs": "Hodnotu nelze napsat ručně – vyberte ji ze šablony nebo z Národních autorit ČR (napište část názvu).",
     "en": "The value cannot be typed in – choose it from the template or from the Czech National Authority File (type a part of the name)."
