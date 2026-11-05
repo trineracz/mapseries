@@ -95,7 +95,7 @@
                         <div class="grid-preview" id="gridPreview"></div>
                         <div class="hint" th:if="${sameGrid != null and !sameGrid.isEmpty()}">
                             Na stejné mřížce jsou i série:
-                            <span th:each="x, st : ${sameGrid}"><a th:href="@{/admin/series/edit(name=${x.name()})}" th:text="${x.prettyName()}"></a><span th:unless="${st.last}">, </span></span>
+                            <th:block th:each="x, st : ${sameGrid}"><a th:href="@{/admin/series/edit(name=${x.name()})}" th:text="${x.prettyName()}"></a><th:block th:unless="${st.last}">, </th:block></th:block>
                         </div>
                     </div>
                 </details>

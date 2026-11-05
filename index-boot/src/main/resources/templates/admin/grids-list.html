@@ -18,11 +18,11 @@
                 <td><a th:href="@{/admin/grids/edit(name=${g.name()})}" th:text="${g.label()}"></a>
                     <div class="tech" th:text="${g.name()}"></div></td>
                 <td>
-                    <span th:each="w, st : ${g.use().works()}"><a th:href="@{/admin/works/edit(layer=${w.layer()})}" th:text="${w.name()}"></a><span th:unless="${st.last}">, </span></span>
+                    <th:block th:each="w, st : ${g.use().works()}"><a th:href="@{/admin/works/edit(layer=${w.layer()})}" th:text="${w.name()}"></a><th:block th:unless="${st.last}">, </th:block></th:block>
                     <span th:if="${g.use().works().isEmpty()}" class="st-none">—</span>
                 </td>
                 <td>
-                    <span th:each="x, st : ${g.use().series()}"><a th:href="@{/admin/series/edit(name=${x.name()})}" th:text="${x.prettyName()}"></a><span th:unless="${st.last}">, </span></span>
+                    <th:block th:each="x, st : ${g.use().series()}"><a th:href="@{/admin/series/edit(name=${x.name()})}" th:text="${x.prettyName()}"></a><th:block th:unless="${st.last}">, </th:block></th:block>
                     <span th:if="${g.use().series().isEmpty()}" class="st-none">—</span>
                 </td>
             </tr>
