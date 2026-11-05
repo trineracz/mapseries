@@ -25,14 +25,20 @@
                 <a th:href="@{/logout}" class="brand-small text-center"><i class="fas fa-sign-out-alt"></i></a>
             </div>
         </div>
-        <ul id="side-main-menu" class="side-menu list-unstyled">
-            <li th:classappend="${activeMenuItem == 'series'} ? 'active'"><a th:href="@{/admin/series}"><i class="fas fa-layer-group"></i><span>Série</span></a></li>
-            <li th:classappend="${activeMenuItem == 'update'} ? 'active'"><a th:href="@{/admin/update.xhtml}"><i class="fas fa-sync"></i><span th:text="#{updateSettings}"></span></a></li>
-            <li th:classappend="${activeMenuItem == 'users'} ? 'active'"><a th:href="@{/admin/users.xhtml}"><i class="fas fa-users-cog"></i><span th:text="#{usersSettings}"></span></a></li>
+        <h5 class="sidenav-heading" th:text="#{menu-cataloguing}"></h5>
+        <ul class="side-menu list-unstyled">
+            <li th:classappend="${activeMenuItem == 'works'} ? 'active'"><a th:href="@{/admin/works}"><i class="fas fa-book"></i><span th:text="#{menu-works}"></span></a></li>
         </ul>
-        <h5 class="sidenav-heading" th:text="#{wrong-data-detection}"></h5>
+        <h5 class="sidenav-heading" th:text="#{menu-web}"></h5>
         <ul id="side-main-menu" class="side-menu list-unstyled">
+            <li th:classappend="${activeMenuItem == 'series'} ? 'active'"><a th:href="@{/admin/series}"><i class="fas fa-layer-group"></i><span th:text="#{menu-series}"></span></a></li>
+            <li th:classappend="${activeMenuItem == 'update'} ? 'active'"><a th:href="@{/admin/update.xhtml}"><i class="fas fa-sync"></i><span th:text="#{updateSettings}"></span></a></li>
             <li th:classappend="${activeMenuItem == 'non-linked-maps'} ? 'active'"><a th:href="@{/admin/non-linked-maps.xhtml}"><i class="fas fa-exclamation-circle"></i><span th:text="#{non-linked-maps}"></span></a></li>
+        </ul>
+        <h5 class="sidenav-heading" th:text="#{menu-shared}"></h5>
+        <ul class="side-menu list-unstyled">
+            <li th:classappend="${activeMenuItem == 'grids'} ? 'active'"><a th:href="@{/admin/grids}"><i class="fas fa-th"></i><span th:text="#{menu-grids}"></span></a></li>
+            <li th:classappend="${activeMenuItem == 'users'} ? 'active'"><a th:href="@{/admin/users.xhtml}"><i class="fas fa-users-cog"></i><span th:text="#{usersSettings}"></span></a></li>
         </ul>
     </div>
 </nav>

@@ -26,16 +26,21 @@ public class HarvestController {
     private final HarvestService harvestService;
     private final HarvestExecutor harvestExecutor;
     private final UpdateTaskRepository updateTaskRepository;
+    private final AdminGate gate;
 
     public HarvestController(HarvestService harvestService, HarvestExecutor harvestExecutor,
-                             UpdateTaskRepository updateTaskRepository) {
+                             UpdateTaskRepository updateTaskRepository, AdminGate gate) {
         this.harvestService = harvestService;
         this.harvestExecutor = harvestExecutor;
         this.updateTaskRepository = updateTaskRepository;
+        this.gate = gate;
     }
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> trigger() {
+        if (!gate.isAdmin()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Admins only"));
+        }
         if (harvestService.tooManyUnfinished()) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of("error", "Too many unfinished tasks"));

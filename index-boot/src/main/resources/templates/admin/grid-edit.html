@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Mapseries — mřížka</title>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/admin.css}"/>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/languages.min.css}"/>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/vendor/leaflet/leaflet.css}"/>
+    <script type="text/javascript" th:src="@{/assets/main.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/vendor/leaflet/leaflet.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/vendor/togeojson/togeojson.umd.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/vendor/topojson/topojson-client.min.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/vendor/proj4/proj4.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/geo-import.js(v=4)}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/geo-export.js(v=4)}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/sheet-map-editor.js(v=4)}"></script>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/series-editor/editor.css(v=3)}"/>
+    <script type="text/javascript" th:src="@{/assets/series-editor/save-bar.js(v=1)}"></script>
+</head>
+<body>
+
+<th:block th:replace="~{fragments :: jsvars}"></th:block>
+
+<div th:if="${admin}" th:replace="~{admin/fragments :: leftPanel}"></div>
+
+<div class="page" th:classappend="${admin} ? '' : 'full'">
+
+    <div th:replace="~{admin/fragments :: topPanel}"></div>
+
+    <div class="main">
+
+        <table th:if="${!authenticated}" class="expand">
+            <tr class="text-center">
+                <td><a class="btn btn-success noexpand" th:href="${authUrl}" th:text="#{login}"></a></td>
+            </tr>
+        </table>
+
+        <table th:if="${authenticated and !admin}" class="expand">
+            <tr class="text-center">
+                <td><p class="text-danger noexpand" th:text="#{notAuthorized}"></p></td>
+            </tr>
+        </table>
+
+        <div th:if="${admin}">
+            <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+            <div id="ws" th:unless="${error}" th:attr="data-mode=${mode},data-grid=${gridName},data-attrs=${attrs}">
+                <a class="btn btn-link" th:href="@{/admin/grids}"><i class="fas fa-arrow-left"></i> Mřížky</a>
+                <h3 th:if="${mode == 'new'}">Nová mřížka listů</h3>
+                <h3 th:unless="${mode == 'new'}">Mřížka listů — <span th:text="${gridLabel}"></span> <span class="tech" th:text="${gridName}"></span></h3>
+
+                <details class="use-box warn uses" th:if="${use != null}" th:open="${use.works().size() + use.series().size() <= 3}">
+                    <summary th:text="${useSummary}"></summary>
+                    <ul>
+                        <li th:each="w : ${use.works()}">mapové dílo pro katalogizaci <a th:href="@{/admin/works/edit(layer=${w.layer()})}" th:text="${w.name()}"></a></li>
+                        <li th:each="x : ${use.series()}">série na webu <a th:href="@{/admin/series/edit(name=${x.name()})}" th:text="${x.prettyName()}"></a></li>
+                        <li th:if="${use.works().isEmpty() and use.series().isEmpty()}" class="hint">nikdo (mřížka se zatím nepoužívá)</li>
+                    </ul>
+                </details>
+                <div class="form-group" th:if="${mode == 'new'}" style="max-width:520px">
+                    <label for="gridNameInput">Název souboru mřížky</label>
+                    <div class="help"><i class="help-i">i</i>Malá písmena bez diakritiky, číslice a pomlčky, např. <code>evropa-karte-slowakei-175-000</code>. Mapové dílo nebo série si mřížku pak vybere podle tohoto názvu.</div>
+                    <input type="text" class="form-control" id="gridNameInput"/>
+                </div>
+
+                <div class="ws-card" id="gridSection">
+                    <div class="ws-body" style="padding-top:14px">
+                        <div class="upload-row">
+                            <label>Nahrát mřížku ze souboru: </label>
+                            <input type="file" id="gridUpload"/>
+                            <span class="help" style="display:inline">— GeoJSON, TopoJSON, KML, GPX nebo CSV; hned se vykreslí na mapě a jde upravit</span>
+                            <span style="margin-left:14px">
+                                <label>Stáhnout jako: </label>
+                                <select id="exportFormat"></select>
+                                <button type="button" id="exportBtn" class="btn btn-sm btn-default"><i class="fas fa-download"></i> Stáhnout</button>
+                            </span>
+                        </div>
+                        <div class="sheets-layout">
+                            <div class="sheets-map"><div id="map"></div></div>
+                            <div class="sheets-side" id="side">
+                                <div class="hint" style="margin-bottom:8px">Práce s celou mřížkou. Jednotlivý list upravíte kliknutím na mapu — otevře se detail pod mapou.</div>
+                                <div class="prop-row" style="margin-bottom:10px">
+                                    <button type="button" id="gotoDetail" class="btn btn-sm btn-default" disabled>Detail vybraného listu ↓</button>
+                                    <span id="selInfo" class="hint"></span>
+                                </div>
+                                <div class="tool">
+                                    <strong>Přidat listy</strong>
+                                    <div class="prop-row" style="margin-top:6px">
+                                        <button type="button" id="pickBtn" class="btn btn-sm btn-primary">Vybrat oblast na mapě</button>
+                                        <label>Ř</label><input type="number" id="rows" min="1" value="1"/>
+                                        <label>S</label><input type="number" id="cols" min="1" value="1"/>
+                                    </div>
+                                    <div class="hint">Klikněte na „Vybrat oblast“, pak <strong>táhněte myší</strong> nebo <strong>klikněte na dva rohy</strong>. Ř×S = řádky × sloupce (1×1 = jeden list).</div>
+                                    <span id="pickStatus"></span>
+                                    <div class="prop-row" style="margin-top:6px">
+                                        <button type="button" id="undoBtn" class="btn btn-sm btn-default"><i class="fas fa-undo"></i> Zpět</button>
+                                    </div>
+                                </div>
+                                <div id="colMgr" class="tool"></div>
+                            </div>
+                        </div>
+                        <p class="hint" style="margin-top:8px">
+                            Klik na list = úprava (tažením rohů měníte velikost, zelený úchyt nahoře pro <strong>rotaci</strong>;
+                            Shift/Ctrl = rotace po 15°). Najetí myší nabídne prázdné sousedy „+". Ctrl/Cmd+Z = zpět.
+                        </p>
+                        <div class="ws-card" id="selCard" style="margin-top:10px">
+                            <div class="ws-body" style="padding:12px 14px">
+                                <strong>Vybraný list</strong>
+                                <div id="props"><p class="hint">Klikněte na list na mapě — jeho údaje, souřadnice a rotace se ukážou tady a půjdou upravit.</p></div>
+                            </div>
+                        </div>
+                        <details class="ws-card" id="tableSection" style="margin-top:10px">
+                            <summary style="padding:8px 10px">Tabulka všech listů <span class="sub">— hromadná úprava atributů</span></summary>
+                            <div class="ws-body" style="padding-top:8px">
+                                <div class="hint" style="margin-bottom:6px">Hodnoty upravte přímo v tabulce. Klik na číslo listu ho vybere i na mapě. V hlavičce sloupce lze hodnotu hromadně vyplnit/vymazat.</div>
+                                <div style="margin-bottom:6px">
+                                    <button type="button" id="tableFindBtn" class="btn btn-sm btn-default" disabled><i class="fas fa-crosshairs"></i> Najít vybraný list</button>
+                                    <span class="hint">— posune tabulku na list vybraný na mapě</span>
+                                </div>
+                                <div id="sheetTableWrap" class="sheet-table-wrap"></div>
+                            </div>
+                        </details>
+                        <details class="ws-card" id="rawSection" style="margin-top:10px">
+                            <summary style="padding:8px 10px">Pokročilé: upravit GeoJSON jako text <span class="sub">— pro ruční/hromadné zásahy</span></summary>
+                            <div class="ws-body" style="padding-top:8px">
+                                <div class="hint" style="margin-bottom:6px">Načte aktuální mřížku jako text. Po úpravě klikněte na „Použít do mapy“ — proběhne validace a mapa se překreslí. <strong>Načíst z mapy</strong> vezme aktuální stav zpět do textu.</div>
+                                <div style="margin-bottom:6px">
+                                    <button type="button" id="rawReload" class="btn btn-sm btn-default">Načíst z mapy</button>
+                                    <button type="button" id="rawApply" class="btn btn-sm btn-primary">Použít do mapy</button>
+                                    <span id="rawMsg" class="hint"></span>
+                                </div>
+                                <textarea id="rawText" spellcheck="false" style="width:100%;height:36vh;font-family:monospace;font-size:12px"></textarea>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <div id="saveBar">
+                    <button type="button" id="saveBtn" class="btn btn-success btn-lg"><i class="fas fa-save"></i> Uložit mřížku</button>
+                    <span id="saveMsg"></span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>window.admin.main()</script>
+
+<script th:if="${admin and error == null}" th:inline="none">
+(function () {
+    var ws = document.getElementById("ws");
+    if (!ws) { return; }
+    var mode = ws.getAttribute("data-mode");
+    var initialGrid = ws.getAttribute("data-grid") || "";
+    var mapApi = null;
+    // the file name for "Stáhnout" (export)
+    var gridInput = { get value() {
+        var el = document.getElementById("gridNameInput");
+        return el ? el.value : initialGrid;
+    } };
+
+    // the sheet attributes the templates of the díla read: offered as columns
+    function updateSuggested() {
+        var attrs = (ws.getAttribute("data-attrs") || "").split(",").filter(Boolean);
+        if (mapApi && attrs.length) { mapApi.suggestColumns(attrs); }
+    }
+
+    // ---------- ② grid: lazy-init map on first open ----------
+    var gridSection = document.getElementById("gridSection");
+    function initMap(cb) {
+        if (mapApi) { mapApi.invalidateSize(); if (cb) { cb(); } return; }
+        var done = function (gj) { mapApi = SheetMapEditor.init({ initialGeojson: gj, onSelect: onSheetSelect }); mapApi.invalidateSize(); updateSuggested(); if (cb) { cb(); } };
+        if (mode !== "new" && initialGrid) {
+            fetch("/admin/grids/data?name=" + encodeURIComponent(initialGrid))
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (gj) { done(gj); })
+                .catch(function () { done(null); });
+        } else { done(null); }
+    }
+    // like initMap, but when the map already exists don't invalidateSize/fit — used by
+    // the table & raw sections (nested under the already-open map section) so opening
+    // them never jolts the map view or reloads tiles.
+    function ensureEditor(cb) { if (mapApi) { if (cb) { cb(); } return; } initMap(cb); }
+    // selecting a sheet on the map enables the jump buttons (no auto-scroll)
+    var gotoDetail = document.getElementById("gotoDetail"), selInfo = document.getElementById("selInfo");
+    var tableFindBtn = document.getElementById("tableFindBtn");
+    function onSheetSelect(feature) {
+        var has = !!feature;
+        gotoDetail.disabled = !has;
+        tableFindBtn.disabled = !has;
+        selInfo.textContent = has ? "vybrán list " + ((feature.properties || {}).SHEET || (feature.properties || {}).TITLE || "—") : "";
+    }
+    gotoDetail.addEventListener("click", function () {
+        var card = document.getElementById("selCard");
+        if (card && card.scrollIntoView) { card.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    });
+
+    gridSection.addEventListener("toggle", function () { if (gridSection.open) { initMap(); } });
+    // Read a dropped/picked file, convert via GeoImport, draw it on the map.
+    function loadGridFile(file) {
+        if (!file) { return; }
+        var reader = new FileReader();
+        reader.onload = function () {
+            var gj;
+            try { gj = GeoImport.parse(file.name, reader.result); }
+            catch (err) { alert("Nešlo načíst soubor: " + err.message); return; }
+            if (!gridSection.open) { gridSection.open = true; }
+            initMap(function () { mapApi.setGeojson(gj); });
+        };
+        reader.readAsText(file);
+    }
+    var gridUpload = document.getElementById("gridUpload");
+    if (window.GeoImport) { gridUpload.setAttribute("accept", GeoImport.ACCEPT); }
+    gridUpload.addEventListener("change", function (e) {
+        loadGridFile(e.target.files[0]);
+        e.target.value = "";   // allow re-uploading the same file
+    });
+
+    // drag & drop a file anywhere on the map area
+    var dropZone = document.querySelector(".sheets-map");
+    if (dropZone) {
+        ["dragenter", "dragover"].forEach(function (ev) {
+            dropZone.addEventListener(ev, function (e) {
+                if (e.dataTransfer) { e.dataTransfer.dropEffect = "copy"; }
+                e.preventDefault(); e.stopPropagation(); dropZone.classList.add("dragover");
+            });
+        });
+        ["dragleave", "dragend"].forEach(function (ev) {
+            dropZone.addEventListener(ev, function (e) {
+                e.preventDefault(); e.stopPropagation();
+                if (ev === "dragleave" && dropZone.contains(e.relatedTarget)) { return; }
+                dropZone.classList.remove("dragover");
+            });
+        });
+        dropZone.addEventListener("drop", function (e) {
+            e.preventDefault(); e.stopPropagation(); dropZone.classList.remove("dragover");
+            loadGridFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+        });
+    }
+
+    // ---------- ② grid: export / download ----------
+    var exportSel = document.getElementById("exportFormat");
+    if (window.GeoExport && exportSel) {
+        GeoExport.FORMATS.forEach(function (f) {
+            var o = document.createElement("option"); o.value = f.key; o.textContent = f.label; exportSel.appendChild(o);
+        });
+    }
+    document.getElementById("exportBtn").addEventListener("click", function () {
+        if (!mapApi || !mapApi.hasFeatures()) { alert("Mřížka je prázdná — není co stáhnout."); return; }
+        var name = (gridInput && gridInput.value ? gridInput.value : "grid").trim() || "grid";
+        try { GeoExport.download(exportSel.value, mapApi.getGeojson(), name); }
+        catch (err) { alert("Export selhal: " + err.message); }
+    });
+
+    // ---------- ② grid: bulk table view ----------
+    var tableSection = document.getElementById("tableSection");
+    var tableMounted = false;
+    function ensureTableMounted(cb) {
+        ensureEditor(function () {
+            if (!tableMounted) { mapApi.mountTable(document.getElementById("sheetTableWrap")); tableMounted = true; }
+            if (cb) { cb(); }
+        });
+    }
+    tableSection.addEventListener("toggle", function () { if (tableSection.open) { ensureTableMounted(); } });
+    tableFindBtn.addEventListener("click", function () {
+        if (!mapApi || !mapApi.hasSelected()) { alert("Nejdřív klikněte na list na mapě."); return; }
+        if (!tableSection.open) { tableSection.open = true; }
+        ensureTableMounted(function () {
+            tableSection.scrollIntoView({ behavior: "smooth", block: "start" });
+            // let the section scroll settle, then bring the selected row into view + flash it
+            setTimeout(function () { mapApi.scrollToSelectedRow(); }, 350);
+        });
+    });
+
+    // ---------- ② grid: raw GeoJSON text editor ----------
+    var rawSection = document.getElementById("rawSection");
+    var rawText = document.getElementById("rawText"), rawMsg = document.getElementById("rawMsg");
+    function rawLoadFromMap() {
+        rawMsg.className = "hint"; rawMsg.textContent = "";
+        var gj = mapApi ? mapApi.getGeojson() : { type: "FeatureCollection", features: [] };
+        rawText.value = JSON.stringify(gj, function (k, v) { return k === "_template" ? undefined : v; }, 2);
+    }
+    rawSection.addEventListener("toggle", function () {
+        if (!rawSection.open) { return; }
+        ensureEditor(function () { rawLoadFromMap(); });
+    });
+    document.getElementById("rawReload").addEventListener("click", rawLoadFromMap);
+    document.getElementById("rawApply").addEventListener("click", function () {
+        var gj;
+        try { gj = JSON.parse(rawText.value); }
+        catch (err) { rawMsg.className = "hint err"; rawMsg.textContent = "✕ Neplatný JSON: " + err.message; return; }
+        if (!gj || gj.type !== "FeatureCollection" || !Array.isArray(gj.features)) {
+            rawMsg.className = "hint err"; rawMsg.textContent = "✕ Musí to být GeoJSON FeatureCollection (type + features[])."; return;
+        }
+        ensureEditor(function () {
+            mapApi.setGeojson(gj);
+            rawMsg.className = "hint ok"; rawMsg.textContent = "✔ Použito — mřížka má " + gj.features.length + " listů.";
+        });
+    });
+
+
+    initMap();
+
+    // ---------- save ----------
+    var msg = document.getElementById("saveMsg");
+    function fail(m) { msg.textContent = "✕ " + m; msg.style.color = "#b23a2e"; }
+    document.getElementById("saveBtn").addEventListener("click", function () {
+        var name = mode === "new" ? (document.getElementById("gridNameInput").value || "").trim() : initialGrid;
+        if (!name) { return fail("Vyplňte název souboru mřížky."); }
+        if (!mapApi || !mapApi.hasFeatures()) { return fail("Mřížka nemá žádný list — nakreslete nebo nahrajte listy."); }
+        msg.textContent = "Ukládám…"; msg.style.color = "";
+        fetch("/admin/grids/save", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: mode, name: name,
+                geojson: JSON.stringify(mapApi.getGeojson(), function (k, v) { return k === "_template" ? undefined : v; }, 2) })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (!res.success) { return fail(res.message); }
+            msg.style.color = "#2e7d32";
+            if (res.prUrl) {
+                msg.innerHTML = "✔ " + res.message.replace(/</g, "&lt;") +
+                    ' <a href="' + res.prUrl + '" target="_blank" rel="noopener">otevřít návrh změny ↗</a>';
+            } else {
+                msg.textContent = "✔ " + res.message;
+                if (mode === "new" && res.redirect) { setTimeout(function () { location.href = res.redirect; }, 700); }
+            }
+        })
+        .catch(function (e) { fail(e.message); });
+    });
+})();
+</script>
+
+</body>
+</html>

@@ -758,7 +758,7 @@ ms.Template.prototype.updateTemplateAdditions_ = function () {
       } catch (err) {
         return;
       }
-      window.open('/admin/series/edit?grid=' + encodeURIComponent(add.grid), '_blank');
+      window.open('/admin/works/edit?layer=' + encodeURIComponent(add.grid), '_blank');
     }, false, this);
     // at the end of its MARC field (after the $7 code), not inside it
     var last = cb.getElement().parentNode;

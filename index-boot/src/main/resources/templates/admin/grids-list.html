@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/series-editor/editor.css(v=3)}"/>
+    <div class="container-fluid">
+        <h3>Mřížky listů <span class="hint" th:text="'(' + ${grids.size()} + ')'"></span></h3>
+        <p class="lead-help">Mřížka (klad listů) je rozdělení území na listy — obdélníčky na mapě s číslem a názvem
+            listu. Používá ji katalogizace (odtud se do záznamu doplní číslo, název a souřadnice listu) i web (kreslí do ní
+            listy série). Jednu mřížku může používat víc děl i sérií; u každé je vidět, kdo.</p>
+        <div class="page-actions">
+            <a class="btn btn-success" th:href="@{/admin/grids/edit}"><i class="fas fa-plus"></i> Nová mřížka</a>
+        </div>
+        <table class="admin-list">
+            <thead><tr><th style="width:38%">Mřížka</th><th>Mapová díla (katalogizace)</th><th>Série na webu</th></tr></thead>
+            <tbody>
+            <tr th:each="g : ${grids}">
+                <td><a th:href="@{/admin/grids/edit(name=${g.name()})}" th:text="${g.label()}"></a>
+                    <div class="tech" th:text="${g.name()}"></div></td>
+                <td>
+                    <span th:each="w, st : ${g.use().works()}"><a th:href="@{/admin/works/edit(layer=${w.layer()})}" th:text="${w.name()}"></a><span th:unless="${st.last}">, </span></span>
+                    <span th:if="${g.use().works().isEmpty()}" class="st-none">—</span>
+                </td>
+                <td>
+                    <span th:each="x, st : ${g.use().series()}"><a th:href="@{/admin/series/edit(name=${x.name()})}" th:text="${x.prettyName()}"></a><span th:unless="${st.last}">, </span></span>
+                    <span th:if="${g.use().series().isEmpty()}" class="st-none">—</span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>

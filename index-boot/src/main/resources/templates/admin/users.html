@@ -21,9 +21,10 @@
                 <tr th:each="admin : ${admins}">
                     <td>
                         <span th:text="${admin.name}"></span>
+                        <!-- the name goes in a data attribute: Thymeleaf refuses text inside onclick -->
                         <button th:if="${admin.name != currentLogin}" type="button"
-                                class="btn btn-link float-right no-padding"
-                                th:onclick="'window.usersSettings.onRemoveAdminClick(\'' + ${admin.name} + '\')'">
+                                class="btn btn-link float-right no-padding" th:data-admin="${admin.name}"
+                                onclick="window.usersSettings.onRemoveAdminClick(this.getAttribute('data-admin'))">
                             <i class="fas fa-ban" style="color: #dc3545;"></i>
                         </button>
                     </td>

@@ -1,13 +1,12 @@
 package cz.mzk.mapseries.web;
 
+import cz.mzk.mapseries.admin.DataRepoService;
 import cz.mzk.mapseries.config.MapseriesProperties;
 import cz.mzk.mapseries.github.AuthService;
 import cz.mzk.mapseries.github.GithubWriteService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.net.URLEncoder;
@@ -40,13 +38,35 @@ public class SeriesEditorController {
     private final AuthService authService;
     private final GithubWriteService githubWriteService;
     private final MapseriesProperties props;
-    private final RestClient http = RestClient.create();
+
+    private final DataRepoService data;
 
     public SeriesEditorController(AuthService authService, GithubWriteService githubWriteService,
-                                  MapseriesProperties props) {
+                                  MapseriesProperties props, DataRepoService data) {
         this.authService = authService;
         this.githubWriteService = githubWriteService;
         this.props = props;
+        this.data = data;
+    }
+
+    /** What the workspace shows about a série besides its own fields: the grids to
+     *  choose from, the díla of the catalogue that fill it (their template writes
+     *  this name into field 490) and the other séries drawn on the same grid. */
+    private void related(Model model, String name, String grid) {
+        List<DataRepoService.Work> works = data.works();
+        List<DataRepoService.Serie> series = data.series();
+        model.addAttribute("grids", data.gridOptions(works, series));
+        Map<String, String> templates = data.readAll(works.stream().map(DataRepoService.Work::templatePath).toList());
+        List<DataRepoService.Work> filling = new ArrayList<>();
+        for (DataRepoService.Work w : works) {
+            DataRepoService.Field490 f = data.field490(templates.get(w.templatePath()), series);
+            if (f != null && name != null && f.value().equals(name.trim())) {
+                filling.add(w);
+            }
+        }
+        model.addAttribute("fillingWorks", filling);
+        model.addAttribute("sameGrid", series.stream()
+                .filter(x -> grid != null && x.grid().equals(grid) && !x.name().equals(name)).toList());
     }
 
     @GetMapping("/admin/series")
@@ -68,7 +88,8 @@ public class SeriesEditorController {
 
     /** New-series workspace: one page for the whole series (basics + grid + template + wiring). */
     @GetMapping("/admin/series/new")
-    public String newSeries(@RequestParam(required = false) String code, Model model, HttpServletRequest request) {
+    public String newSeries(@RequestParam(required = false) String code, @RequestParam(required = false) String name,
+                            @RequestParam(required = false) String grid, Model model, HttpServletRequest request) {
         if (code != null && !code.isBlank()) {
             authService.authenticate(code);
             return "redirect:/admin/series/new";
@@ -76,10 +97,12 @@ public class SeriesEditorController {
         if (!gate(model, request)) {
             return "admin/series-workspace";
         }
+        // prefilled from a dílo whose 490 has no série yet ("Založit sérii s tímto názvem")
+        related(model, null, grid);
         model.addAttribute("mode", "new");
         model.addAttribute("originalName", "");
-        model.addAttribute("f_name", "");
-        model.addAttribute("f_grid", "");
+        model.addAttribute("f_name", name == null ? "" : name);
+        model.addAttribute("f_grid", grid == null ? "" : grid);
         model.addAttribute("f_sheets", "490v");     // sensible defaults — 100% of series use these
         model.addAttribute("f_field", "490a");
         model.addAttribute("f_groupby", "field.substring(0,4)");
@@ -112,6 +135,7 @@ public class SeriesEditorController {
             return "admin/series-workspace";
         }
         name = item.getString("name");
+        related(model, name, item.optString("grid", ""));
         model.addAttribute("mode", "edit");
         model.addAttribute("originalName", name);
         model.addAttribute("prettyName", prettyName(item.getString("name")));
@@ -143,16 +167,8 @@ public class SeriesEditorController {
         String descEn = req.descEn() == null ? "" : req.descEn();
 
         String err = validate(name, grid, sheets, field, groupby, thumb);
-        if (err == null && req.geojson() != null) {
-            try { new JSONObject(req.geojson()); } catch (Exception e) { err = "Neplatný geojson: " + e.getMessage(); }
-        }
-        boolean hasTemplate = req.template() != null && !req.template().isBlank();
-        if (err == null && hasTemplate) {
-            String terr = validateTemplate(req.template());
-            if (terr != null) err = "Šablona: " + terr;
-        }
-        if (err == null && "new".equals(mode) && req.geojson() == null) {
-            err = "Nová série musí mít mřížku listů.";
+        if (err == null && !data.exists("geojson/" + grid + ".json")) {
+            err = "Vyberte mřížku listů (nová se zakládá v Mřížkách).";
         }
         if (err != null) {
             return Map.of("success", false, "message", err);
@@ -167,8 +183,6 @@ public class SeriesEditorController {
 
         Map<String, String> files = new LinkedHashMap<>();
         files.put(CONTENT_DEFINITION_PATH, serialize(items));
-        if (req.geojson() != null) { files.put("geojson/" + grid + ".json", req.geojson()); }
-        if (hasTemplate) { files.put("template/" + grid + ".txt", req.template()); }
 
         GithubWriteService.SaveResult result;
         try {
@@ -190,8 +204,7 @@ public class SeriesEditorController {
     }
 
     public record SaveRequest(String mode, String originalName, String name, String descCs, String descEn,
-                              String thumbnailUrl, String field, String sheets, String groupby, String grid,
-                              String geojson, String template) {
+                              String thumbnailUrl, String field, String sheets, String groupby, String grid) {
     }
 
     /** Remove a series from content-definition.json (the grid geojson is left as an
@@ -216,49 +229,6 @@ public class SeriesEditorController {
             }
         }
         return "redirect:/admin/series";
-    }
-
-    /** The standalone sheets page is folded into the workspace; keep the URL working. */
-    @GetMapping("/admin/series/sheets")
-    public String sheetsRedirect(@RequestParam String name, @RequestParam(required = false) String code) {
-        if (code != null && !code.isBlank()) { authService.authenticate(code); }
-        return "redirect:/admin/series/edit?name=" + enc(name);
-    }
-
-    /** Admin loads the grid geojson from the WRITE repo (its own edits), fresh — the map
-     *  editor can't use /server/data (that proxies the READ repo and misses fork edits). */
-    @GetMapping(value = "/admin/series/sheets/data", produces = MediaType.APPLICATION_JSON_VALUE)
-    @ResponseBody
-    public ResponseEntity<String> sheetData(@RequestParam String grid) {
-        if (!(authService.isAuthenticated() && authService.isAdmin())) {
-            return ResponseEntity.status(403).build();
-        }
-        try {
-            return ResponseEntity.ok(readRaw("geojson/" + grid + ".json"));
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    /** The standalone template page is folded into the workspace; keep the URL working. */
-    @GetMapping("/admin/series/template")
-    public String templateRedirect(@RequestParam String name, @RequestParam(required = false) String code) {
-        if (code != null && !code.isBlank()) { authService.authenticate(code); }
-        return "redirect:/admin/series/edit?name=" + enc(name);
-    }
-
-    /** Admin loads the MARC21 template text from the WRITE repo (its own edits), fresh. */
-    @GetMapping(value = "/admin/series/template/data", produces = "text/plain;charset=UTF-8")
-    @ResponseBody
-    public ResponseEntity<String> templateData(@RequestParam String grid) {
-        if (!(authService.isAuthenticated() && authService.isAdmin())) {
-            return ResponseEntity.status(403).build();
-        }
-        try {
-            return ResponseEntity.ok(readRaw("template/" + grid + ".txt"));
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
     }
 
     /** Every {...} field definition in the template must be valid JSON — otherwise the
@@ -307,38 +277,22 @@ public class SeriesEditorController {
 
     private static String validate(String name, String grid, String sheets, String field,
                                    String groupby, String thumbnailUrl) {
-        if (name == null || name.isBlank()) return "Vyplň název série.";
-        if (grid == null || grid.isBlank()) return "Vyplň název mřížky (grid).";
-        if (field == null || field.isBlank()) return "Vyplň párovací pole (field).";
-        if (sheets == null || sheets.isBlank()) return "Vyplň pole listů (sheets).";
-        if (groupby == null || groupby.isBlank()) return "Vyplň pravidlo groupby.";
-        if (thumbnailUrl == null || thumbnailUrl.isBlank()) return "Vyplň URL náhledu.";
+        if (name == null || name.isBlank()) return "Vyplňte název série.";
+        if (grid == null || grid.isBlank()) return "Vyberte mřížku listů.";
+        if (field == null || field.isBlank()) return "Chybí pole s názvem série (490a).";
+        if (sheets == null || sheets.isBlank()) return "Chybí pole s číslem listu (490v).";
+        if (groupby == null || groupby.isBlank()) return "Vyplňte pravidlo pro číslo listu.";
+        if (thumbnailUrl == null || thumbnailUrl.isBlank()) return "Vyplňte adresu náhledového obrázku.";
         return null;
     }
 
     private List<JSONObject> readContentDefinition() {
-        JSONArray arr = new JSONArray(readRaw(CONTENT_DEFINITION_PATH));
+        JSONArray arr = new JSONArray(data.read(CONTENT_DEFINITION_PATH));
         List<JSONObject> out = new ArrayList<>();
         for (Object o : arr) {
             out.add((JSONObject) o);
         }
         return out;
-    }
-
-    /** The admin edits the WRITE repo, so it must READ from there too — otherwise a series
-     *  it just created (which only exists in the write repo/fork) reads back as "not found".
-     *  Uses the authenticated contents API, not raw.githubusercontent.com, whose CDN caches
-     *  ~5 min and would hide a fresh commit. In production read == write, so this is a no-op. */
-    private String readRaw(String path) {
-        String repo = props.repo().writeUser() + "/" + props.repo().writeName();
-        String url = "https://api.github.com/repos/" + repo + "/contents/" + path + "?ref=master";
-        String token = authService.getToken();
-        return http.get().uri(url)
-                .headers(h -> {
-                    h.set("Accept", "application/vnd.github.raw");
-                    if (token != null && !token.isBlank()) { h.setBearerAuth(token); }
-                })
-                .retrieve().body(String.class);
     }
 
     private static JSONObject findByGrid(List<JSONObject> items, String grid) {
@@ -374,7 +328,7 @@ public class SeriesEditorController {
     }
 
     /** Serialize with a stable key order (matches the repo's layout) to keep diffs clean. */
-    private static String serialize(List<JSONObject> items) {
+    static String serialize(List<JSONObject> items) {
         StringBuilder sb = new StringBuilder("[\n");
         for (int i = 0; i < items.size(); i++) {
             JSONObject o = items.get(i);

@@ -61,7 +61,7 @@ public class AdminController {
 
     @GetMapping("/admin")
     public String adminRoot() {
-        return "redirect:/admin/series";
+        return "redirect:/admin/works";
     }
 
     // Content settings merged into the new series editor (/admin/series); kept as a
@@ -172,7 +172,7 @@ public class AdminController {
         model.addAttribute("authUrl", authUrl(request));
 
         if (admin) {
-            model.addAttribute("nonLinkedMaps", dataAnalyzer.getNonLinkedMaps());
+            model.addAttribute("report", dataAnalyzer.getNonLinkedReport());
         }
         return "admin/non-linked-maps";
     }

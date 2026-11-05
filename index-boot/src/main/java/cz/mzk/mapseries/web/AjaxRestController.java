@@ -42,8 +42,23 @@ public class AjaxRestController {
         this.githubWriteService = githubWriteService;
     }
 
+    /** Null when the visitor is a signed-in admin, otherwise the refusal (as the old AjaxRestApi). */
+    private Map<String, Object> notAdmin() {
+        if (!authService.isAuthenticated()) {
+            return result(false, "You are not authenticated.");
+        }
+        if (!authService.isAdmin()) {
+            return result(false, "You are not authorized.");
+        }
+        return null;
+    }
+
     @RequestMapping("/updateSettings/updateAction")
     public Map<String, Object> updateAction() {
+        Map<String, Object> refused = notAdmin();
+        if (refused != null) {
+            return refused;
+        }
         if (harvestService.tooManyUnfinished()) {
             return result(false, "Too many unfinished tasks");
         }
@@ -54,6 +69,10 @@ public class AjaxRestController {
 
     @RequestMapping("/updateSettings/restoreVersion")
     public Map<String, Object> restoreVersion(@RequestParam long version) {
+        Map<String, Object> refused = notAdmin();
+        if (refused != null) {
+            return refused;
+        }
         harvestService.restoreVersion(version);
         return result(true, "");
     }
@@ -61,6 +80,10 @@ public class AjaxRestController {
     @RequestMapping("/usersSettings/addAdmin")
     @Transactional
     public Map<String, Object> addAdmin(@RequestParam String adminName) {
+        Map<String, Object> refused = notAdmin();
+        if (refused != null) {
+            return refused;
+        }
         AdminDAO admin = new AdminDAO();
         admin.setName(adminName);
         adminRepository.save(admin);
@@ -70,14 +93,19 @@ public class AjaxRestController {
     @RequestMapping("/usersSettings/removeAdmin")
     @Transactional
     public Map<String, Object> removeAdmin(@RequestParam String adminName) {
+        Map<String, Object> refused = notAdmin();
+        if (refused != null) {
+            return refused;
+        }
         adminRepository.deleteById(adminName);
         return result(true, "");
     }
 
     @PostMapping("/contentDefinition/update")
     public Map<String, Object> contentDefinitionUpdate(@RequestBody Map<String, String> body) {
-        if (!authService.isAuthenticated()) {
-            return result(false, "Not logged in");
+        Map<String, Object> refused = notAdmin();
+        if (refused != null) {
+            return refused;
         }
         try {
             githubWriteService.saveFile(authService.getToken(),

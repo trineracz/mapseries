@@ -129,7 +129,9 @@ window.TemplateForm = (function () {
             else if (d.tag.charAt(0) === "7" && d.subfield === "a") { kind = "entry"; }
             else if (d.tag.charAt(0) === "7" && d.offset === 3) { kind = "entryInd"; }
             else if (d.tag.charAt(0) === "7" || wholeLine(d)) { kind = "optional"; }
-            return { block: d, kind: kind, label: d.obj.title || d.obj.id || "", where: where(d) };
+            // an indicator is called "Identifikátor" in the templates: name it for what it is
+            var label = kind === "ind" || kind === "entryInd" ? "Indikátor" : d.obj.title || d.obj.id || "";
+            return { block: d, kind: kind, label: label, where: where(d) };
         });
         var keys = columnKeys(deps);
         cols.forEach(function (c, i) { c.key = keys[i]; });
@@ -474,8 +476,13 @@ window.TemplateForm = (function () {
 
         function listHtml(b, li) {
             var o = b.obj, title = o.title || o.id;
-            var same = model.lists.filter(function (x) { return (x.obj.title || x.obj.id) === title; });
-            if (same.length > 1) { title += " (" + (same.indexOf(b) + 1) + ".)"; }
+            // the same drop-down offered several times in one field: the 1st, 2nd… value of
+            // the field (041 $a holds up to three languages of the map)
+            var same = model.lists.filter(function (x) { return (x.obj.title || x.obj.id) === title && x.tag === b.tag; });
+            if (same.length > 1) {
+                var nth = same.indexOf(b) + 1;
+                title += b.tag === "041" ? " — " + nth + ". jazyk mapy" : " (" + nth + ". v poli " + b.tag + ")";
+            }
             // longer values (e.g. 500 notes) get a whole line each
             var long = o.values.some(function (v) { return String(v).length > 16; });
             var h = '<div class="tf-card tf-list' + (long ? " tf-list-long" : "") + '" data-l="' + li + '"><h5>' + esc(title) +
@@ -493,12 +500,14 @@ window.TemplateForm = (function () {
                 return;
             }
             var h = '<p class="help"><i class="help-i">i</i>Tady upravíte, z čeho katalogizátor vybírá. ' +
-                "Změny se hned propíšou do textu šablony; uloží se tlačítkem „Uložit sérii“. " +
+                "Změny se hned propíšou do textu šablony; uloží se tlačítkem Uložit dole na stránce. " +
                 "Přidat nebo odebrat celé pole MARC jde zatím jen v textu (pokročilé).</p>";
             model.tables.forEach(function (t, ti) { h += tableHtml(t, ti); });
             if (model.lists.length) {
                 h += '<h4 class="tf-section">Další nabídky</h4><p class="hint">Hodnoty, které katalog nabídne ' +
-                    "v rozbalovacím poli (katalogizátor z nich vybírá, nic dalšího se podle nich nevyplňuje).</p>";
+                    "v rozbalovacím poli (katalogizátor z nich vybírá, nic dalšího se podle nich nevyplňuje). " +
+                    "Když je stejná nabídka v jednom poli víckrát, je to pro 1., 2., 3. hodnotu pole — např. 041 $a " +
+                    "umí zapsat až tři jazyky mapy.</p>";
                 model.lists.forEach(function (b, li) { h += listHtml(b, li); });
             }
             root.innerHTML = h;

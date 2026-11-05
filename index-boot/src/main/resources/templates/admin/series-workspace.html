@@ -7,200 +7,12 @@
     <title>Mapseries — série</title>
     <link rel="stylesheet" type="text/css" th:href="@{/assets/admin.css}"/>
     <link rel="stylesheet" type="text/css" th:href="@{/assets/languages.min.css}"/>
-    <link rel="stylesheet" type="text/css" th:href="@{/assets/vendor/leaflet/leaflet.css}"/>
     <script type="text/javascript" th:src="@{/assets/main.js}"></script>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/vendor/leaflet/leaflet.css}"/>
     <script type="text/javascript" th:src="@{/assets/vendor/leaflet/leaflet.js}"></script>
-    <script type="text/javascript" th:src="@{/assets/vendor/togeojson/togeojson.umd.js}"></script>
-    <script type="text/javascript" th:src="@{/assets/vendor/topojson/topojson-client.min.js}"></script>
-    <script type="text/javascript" th:src="@{/assets/vendor/proj4/proj4.js}"></script>
-    <script type="text/javascript" th:src="@{/assets/series-editor/geo-import.js(v=4)}"></script>
-    <script type="text/javascript" th:src="@{/assets/series-editor/geo-export.js(v=4)}"></script>
-    <script type="text/javascript" th:src="@{/assets/series-editor/sheet-map-editor.js(v=4)}"></script>
-    <script type="text/javascript" th:src="@{/assets/series-editor/template-editor.js(v=4)}"></script>
-    <script type="text/javascript" th:src="@{/assets/series-editor/template-form.js(v=1)}"></script>
-    <style>
-        .ws-card { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 14px; background: #fff; }
-        .ws-card > summary { cursor: pointer; font-weight: bold; font-size: 15px; padding: 12px 14px;
-            outline: none; list-style: none; }
-        .ws-card > summary::-webkit-details-marker { display: none; }
-        .ws-card > summary::before { content: "▸ "; color: #888; }
-        .ws-card[open] > summary::before { content: "▾ "; }
-        .ws-card > summary .sub { font-weight: normal; color: #888; font-size: 13px; margin-left: 6px; }
-        .ws-body { padding: 0 14px 14px; }
-        .ws-num { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center;
-            background: #3388ff; color: #fff; border-radius: 50%; font-size: 12px; margin-right: 6px; }
-        .ws-advanced { background: #f6f7f9; }
-        .ws-advanced .ws-body { color: #444; }
-        .help { color: #777; font-size: 12px; margin: 2px 0 8px; }
-        .help-i { display: inline-block; width: 15px; height: 15px; line-height: 15px; text-align: center;
-            border-radius: 50%; background: #bbb; color: #fff; font-size: 11px; font-style: normal; margin-right: 4px; }
-        .upload-row { margin: 6px 0 10px; }
-        .thumb-preview { max-height: 90px; border: 1px solid #ddd; margin-top: 6px; display: none; }
-
-        /* sheet map editor */
-        .sheets-layout { display: flex; gap: 16px; align-items: stretch; }
-        .sheets-map { flex: 1 1 auto; position: relative; }
-        .sheets-map.dragover::after { content: "Pusť soubor pro nahrání mřížky"; position: absolute; inset: 0;
-            z-index: 1200; display: flex; align-items: center; justify-content: center;
-            background: rgba(51,136,255,0.12); border: 3px dashed #3388ff; color: #24518c; font-weight: 700;
-            pointer-events: none; }
-        #map { height: 62vh; border: 1px solid #ccc; }
-        .sheets-side { flex: 0 0 360px; max-height: 62vh; overflow-y: auto; border: 1px solid #ccc; padding: 12px; }
-        .sheets-side .hint { color: #888; font-size: 13px; }
-        .prop-row { margin-bottom: 8px; }
-        /* selected-sheet detail below the map: lay attributes out in responsive columns */
-        #selCard .attr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 14px; }
-        #selCard #coordBox { margin-top: 8px; max-width: 560px; }
-        .prop-row label { display: block; font-size: 12px; color: #555; margin-bottom: 2px; }
-        .prop-row input, .prop-row textarea { width: 100%; }
-        .col-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-        .col-row .cname { flex: 1 1 auto; font-family: monospace; font-size: 12px; }
-        .sel { font-weight: bold; }
-        .tool { border: 1px solid #ddd; background: #fafafa; padding: 10px; margin-bottom: 12px; }
-        .tool input[type=number] { width: 64px; }
-        #pickStatus { font-size: 12px; color: #b23a2e; }
-        .leaflet-tooltip.sheet-label { background: transparent; border: none; box-shadow: none;
-            color: #1a1a1a; font-size: 10px; font-weight: 700; padding: 0; }
-        .leaflet-tooltip.sheet-label-md { font-size: 13px; }
-        .leaflet-tooltip.sheet-label-lg { font-size: 16px; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
-        .ghost-plus { color: #2e7d32; font: 700 16px/20px sans-serif; text-align: center;
-            background: rgba(255,255,255,0.75); border: 1px solid #2e7d32; border-radius: 50%; }
-        .vhandle { background: #fff; border: 2px solid #b23a2e; border-radius: 2px; box-sizing: border-box; cursor: nwse-resize; }
-        .rothandle { background: #2e7d32; border: 2px solid #fff; border-radius: 50%; box-sizing: border-box; cursor: grab; }
-        .edgehandle { background: #fff; border: 2px solid #b23a2e; box-sizing: border-box; cursor: ew-resize; }
-        .movehandle { background: #3388ff; border: 2px solid #fff; border-radius: 50%; box-sizing: border-box; cursor: move; }
-
-        /* template editor */
-        .tpl-layout { display: flex; gap: 16px; align-items: stretch; }
-        .tpl-col { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
-        .tpl-col h5 { margin: 0 0 6px; }
-        .tpl-editor { position: relative; height: 44vh; }
-        #tplBackdrop, #tplText {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0; margin: 0;
-            font-family: monospace; font-size: 12px; line-height: 1.35; padding: 8px;
-            border: 1px solid #ccc; box-sizing: border-box; white-space: pre; overflow: auto; }
-        /* transparent border keeps the box metrics aligned with the textarea but draws
-           no visible line (a shorter opaque border used to strike through the text) */
-        #tplBackdrop { z-index: 1; background: #fff; color: transparent; pointer-events: none; border-color: transparent; }
-        #tplBackdrop mark { background: #ffd0d0; color: transparent; }
-        #tplText { z-index: 2; background: transparent; color: #222; resize: none; }
-        #tplText.bad { border-color: #b23a2e; }
-        #synMsg.ok { color: #2e7d32; }
-        #synMsg.err { color: #b23a2e; }
-        .tpl-preview { height: 44vh; overflow-y: auto; border: 1px solid #ccc; padding: 8px; background: #fafafa; }
-        .tpl-preview table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .tpl-preview th, .tpl-preview td { border-bottom: 1px solid #e5e5e5; padding: 4px 6px; text-align: left; vertical-align: top; }
-        .tpl-preview th { color: #555; font-weight: 600; }
-        .tpl-tag { font-family: monospace; color: #0b5; font-weight: 700; }
-        .tpl-type.ro { color: #999; }
-        .tpl-detail { font-family: monospace; color: #b26a00; }
-        .tpl-opts .more { color: #999; }
-        .badge-ro { background: #eee; color: #777; border-radius: 3px; font-size: 10px; padding: 1px 4px; margin-left: 4px; }
-        /* template form (template-form.js) */
-        .tpl-tabs { display: flex; gap: 4px; border-bottom: 1px solid #ccc; margin: 6px 0 10px; }
-        .tpl-tabs button { border: 1px solid #ccc; border-bottom: none; background: #f6f7f9; padding: 6px 14px;
-            border-radius: 4px 4px 0 0; margin-bottom: -1px; font-size: 13px; }
-        .tpl-tabs button.active { background: #fff; font-weight: 600; border-bottom: 1px solid #fff; }
-        .tf-card { border: 1px solid #e3e3e3; border-radius: 4px; padding: 10px 12px; margin-bottom: 14px; }
-        .tf-card h5 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
-        .tf-section { font-size: 15px; margin: 18px 0 8px; }
-        .tf-where { font-family: monospace; font-size: 11px; color: #0b5; margin-left: 6px; font-weight: normal; }
-        th .tf-where { display: block; margin-left: 0; }
-        /* columns keep a readable width (text wraps, cells grow); a table wider
-           than the page scrolls sideways on its own, the page does not */
-        .tf-scroll { overflow-x: auto; margin: 6px 0 8px; }
-        table.tf-table { border-collapse: collapse; font-size: 12px; width: 100%; }
-        table.tf-table th.w-act { min-width: 80px; }
-        table.tf-table th.w-main { min-width: 220px; }
-        table.tf-table th.w-short { min-width: 64px; width: 64px; }
-        table.tf-table th.w-code { min-width: 110px; }
-        table.tf-table th.w-text { min-width: 170px; }
-        table.tf-table th.w-wide { min-width: 220px; }
-        table.tf-table th, table.tf-table td { border: 1px solid #e5e5e5; padding: 3px 5px; vertical-align: top;
-            overflow-wrap: break-word; }
-        table.tf-table th { background: #f6f7f9; text-align: left; font-weight: 600; overflow-wrap: normal;
-            hyphens: auto; -webkit-hyphens: auto; }
-        table.tf-table td textarea, table.tf-table td input { display: block; width: 100%; box-sizing: border-box;
-            border: 1px solid #d5d9de; border-radius: 2px; background: #fff; font-size: 12px; padding: 2px 4px;
-            font-family: monospace; resize: none; overflow: hidden; line-height: 1.35; }
-        table.tf-table td:has(input, textarea) { cursor: text; }
-        table.tf-table td input.tf-short { text-align: center; }
-        table.tf-table td textarea:hover, table.tf-table td input:hover { border-color: #9fb3c8; }
-        table.tf-table td textarea:focus, table.tf-table td input:focus { border-color: #3388ff; background: #fff; outline: none; }
-        table.tf-table tbody tr { background: #fff; }
-        table.tf-table tr.tf-flash td { animation: tf-flash 1.6s ease; }
-        @keyframes tf-flash { from { background: #fff3a8; } to { background: transparent; } }
-        table.tf-table tr.tf-leaving { opacity: 0; transition: opacity .3s ease; }
-        table.tf-table tr.tf-prefilled td.tf-num { box-shadow: inset 3px 0 0 #2e7d32; }
-        .tf-banner { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; padding: 8px 12px; margin-bottom: 10px; }
-        table.tf-table td.tf-bad { background: #fff1f0; box-shadow: inset 0 0 0 1px #e0605a; }
-        .tf-num { color: #999; text-align: right; }
-        .tf-main .tf-pick { margin: 2px 0 0; }
-        .tf-ident { font-family: monospace; margin-right: 6px; }
-        .tf-code { font-family: monospace; color: #888; font-size: 11px; margin-right: 6px; }
-        .tf-ro { color: #999; font-family: monospace; }
-        .tf-pick, .tf-clear, .tf-row-actions button { border: 1px solid #ccc; background: #fff; border-radius: 3px;
-            font-size: 11px; padding: 0 6px; margin-left: 2px; }
-        .tf-row-actions { white-space: nowrap; }
-        .tf-main .tf-ident { font-family: inherit; font-weight: 600; }
-        table.tf-table td input.tf-roles { display: inline-block; width: 90px; color: #b26a00; }
-        .tf-entry .tf-pick, .tf-entry .tf-clear { margin-top: 2px; }
-        .tf-problems { font-size: 12px; color: #b23a2e; }
-        .tf-problems ul { margin: 4px 0 0; padding-left: 18px; }
-        .tf-items { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
-        .tf-item { border: 1px solid #ddd; border-radius: 3px; padding: 1px 2px 1px 4px; }
-        .tf-item input { border: none; font-family: monospace; font-size: 12px; width: 140px; outline: none; }
-        .tf-item { cursor: text; background: #fff; }
-        .tf-item:focus-within { border-color: #3388ff; }
-        .tf-list-long .tf-items { display: block; }
-        .tf-list-long .tf-item { display: flex; margin-bottom: 6px; }
-        .tf-list-long .tf-item input { flex: 1; width: auto; }
-        .tf-item .tf-del { border: none; background: none; color: #999; }
-        .tf-modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 3000; display: none;
-            align-items: flex-start; justify-content: center; padding-top: 10vh; }
-        .tf-dialog { background: #fff; border-radius: 6px; padding: 16px; width: 640px; max-width: 94vw;
-            max-height: 75vh; overflow: auto; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
-        .tf-dialog h4 { margin: 0 0 10px; }
-        .tf-results { margin: 8px 0; }
-        .tf-result { display: block; width: 100%; text-align: left; border: none; border-bottom: 1px solid #eee;
-            background: #fff; padding: 6px 4px; font-size: 13px; }
-        .tf-result:hover { background: #eef5ff; }
-        .tf-var { display: block; color: #999; font-size: 11px; }
-        .tf-manual summary { cursor: pointer; color: #555; font-size: 13px; }
-        .tf-manual-body label { display: block; font-weight: normal; font-size: 12px; margin-top: 6px; }
-        .tf-buttons { text-align: right; margin-top: 10px; }
-        .hint { color: #888; font-size: 13px; }
-        .hint.ok { color: #2e7d32; }
-        .hint.err { color: #b23a2e; }
-
-        /* bulk sheet table */
-        .sheet-table-wrap { max-height: 50vh; overflow: auto; border: 1px solid #ddd; }
-        table.sheet-table { border-collapse: collapse; font-size: 12px; width: 100%; }
-        table.sheet-table th, table.sheet-table td { border: 1px solid #e5e5e5; padding: 2px 4px; }
-        table.sheet-table thead th { position: sticky; top: 0; background: #f6f7f9; z-index: 1; text-align: left; }
-        table.sheet-table th .cbar { display: flex; gap: 4px; align-items: center; }
-        table.sheet-table th .cbar .cn { font-family: monospace; }
-        table.sheet-table td input { width: 100%; border: 1px solid transparent; background: transparent; font-size: 12px; padding: 1px 2px; }
-        table.sheet-table td input:focus { border-color: #3388ff; background: #fff; }
-        table.sheet-table td.sheet-cell { white-space: nowrap; }
-        table.sheet-table th.loc-col, table.sheet-table td.loc-cell { width: 26px; padding: 0; text-align: center; }
-        table.sheet-table a.rowsel { display: inline-block; width: 100%; padding: 3px 0; cursor: pointer;
-            text-decoration: none; color: #3388ff; }
-        table.sheet-table a.rowsel:hover { background: #e8eefc; color: #24518c; }
-        table.sheet-table .colbtn { border: none; background: #e8eefc; color: #24518c; border-radius: 3px; font-size: 10px; padding: 0 4px; cursor: pointer; }
-        table.sheet-table tr.sel-row td { background: #dce8ff; }
-        table.sheet-table tr.row-flash td { background: #fff3cd; transition: background .3s ease; }
-
-        .gb-opt { display: block; margin: 4px 0; }
-        .gb-ex { color: #888; font-family: monospace; font-size: 12px; margin-left: 8px; }
-        .gb-test { background: #eef3ff; border: 1px solid #cdd9f5; padding: 6px 8px; border-radius: 4px; margin-top: 6px; font-size: 13px; }
-        .gb-test code { background: #fff; padding: 1px 4px; border: 1px solid #ddd; }
-        /* .main (the scrolling box) has 25px padding at the bottom: without the
-           negative offset the bar stops above it and content shows underneath */
-        #saveBar { position: sticky; bottom: -25px; z-index: 1000; background: #fff; border-top: 1px solid #ddd;
-            padding: 12px 0 37px; margin-top: 8px; margin-bottom: -25px; }
-        #saveMsg { margin-left: 12px; }
-    </style>
+    <script type="text/javascript" th:src="@{/assets/series-editor/grid-preview.js(v=1)}"></script>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/series-editor/editor.css(v=3)}"/>
+    <script type="text/javascript" th:src="@{/assets/series-editor/save-bar.js(v=1)}"></script>
 </head>
 <body>
 
@@ -232,14 +44,9 @@
             <div id="ws" th:unless="${error}" th:attr="data-mode=${mode},data-name=${originalName},data-grid=${f_grid},data-groupby=${f_groupby}">
                 <div class="row">
                     <div class="col-md-12">
-                        <a class="btn btn-link" th:href="@{/admin/series}"><i class="fas fa-arrow-left"></i> Zpět na seznam</a>
+                        <a class="btn btn-link" th:href="@{/admin/series}"><i class="fas fa-arrow-left"></i> Série</a>
                         <h3 th:if="${mode == 'new'}">Nová série</h3>
                         <h3 th:unless="${mode == 'new'}">Úprava série — <span th:text="${prettyName}"></span></h3>
-                        <form th:if="${mode != 'new'}" method="post" th:action="@{/admin/series/delete}" style="display:inline"
-                              onsubmit="return confirm('Opravdu smazat tuto sérii z content-definition.json?');">
-                            <input type="hidden" name="name" th:value="${originalName}"/>
-                            <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> Smazat sérii</button>
-                        </form>
                     </div>
                 </div>
 
@@ -251,7 +58,7 @@
                             <div class="col-md-8">
                                 <div class="form-group">
                                     <label>Název série</label>
-                                    <div class="help"><i class="help-i">i</i>Přesný název tak, jak je v katalogovém záznamu (MARC 490 $a). Část v hranatých závorkách <code>[...]</code> se použije jako hezký název.</div>
+                                    <div class="help"><i class="help-i">i</i>Přesně tak, jak je v poli 490 $a záznamů v Alephu (včetně závorek a středníku, např. <code>[Slowakei 1:75 000] ;</code>) — podle toho web záznamy do série zařadí. Část v hranatých závorkách <code>[...]</code> se použije jako hezký název.</div>
                                     <input type="text" class="form-control" name="name" th:value="${f_name}" required="required"/>
                                 </div>
                                 <div class="form-group">
@@ -273,137 +80,51 @@
                 </details>
 
                 <!-- ② MŘÍŽKA LISTŮ -->
-                <details class="ws-card" id="gridSection">
-                    <summary><span class="ws-num">2</span> Mřížka listů <span class="sub" id="gridSub">— nakresli na mapě nebo nahraj geojson</span></summary>
+                <details class="ws-card" open="open">
+                    <summary><span class="ws-num">2</span> Mřížka listů <span class="sub">— na které se listy série kreslí na webu</span></summary>
                     <div class="ws-body">
-                        <div class="upload-row">
-                            <label>Nahrát mřížku (nepovinné): </label>
-                            <input type="file" id="gridUpload"/>
-                            <span class="help" style="display:inline">— GeoJSON, TopoJSON, KML, GPX nebo CSV; hned se vykreslí na mapě a jde upravit</span>
-                            <span style="margin-left:14px">
-                                <label>Stáhnout jako: </label>
-                                <select id="exportFormat"></select>
-                                <button type="button" id="exportBtn" class="btn btn-sm btn-default"><i class="fas fa-download"></i> Stáhnout</button>
-                            </span>
+                        <div class="help"><i class="help-i">i</i>Mřížky se upravují a zakládají v <a th:href="@{/admin/grids}">Mřížkách</a>; tady jen vyberete, kterou série používá.</div>
+                        <div class="form-group" style="max-width:640px">
+                            <label for="gridSelect">Mřížka</label>
+                            <select class="form-control" id="gridSelect" name="grid">
+                                <option value="">— vyberte —</option>
+                                <option th:each="g : ${grids}" th:value="${g.name()}" th:text="${g.label()} + '  (' + ${g.name()} + ')'" th:selected="${g.name() == f_grid}"></option>
+                            </select>
+                            <a id="gridEditLink" class="btn btn-link" th:href="@{/admin/grids/edit(name=${f_grid})}" th:if="${f_grid != null and f_grid != ''}"><i class="fas fa-th"></i> Upravit tuto mřížku</a>
                         </div>
-                        <div class="sheets-layout">
-                            <div class="sheets-map"><div id="map"></div></div>
-                            <div class="sheets-side" id="side">
-                                <div class="hint" style="margin-bottom:8px">Práce s celou mřížkou. Jednotlivý list uprav kliknutím na mapě — otevře se detail pod mapou.</div>
-                                <div class="prop-row" style="margin-bottom:10px">
-                                    <button type="button" id="gotoDetail" class="btn btn-sm btn-default" disabled>Detail vybraného listu ↓</button>
-                                    <span id="selInfo" class="hint"></span>
-                                </div>
-                                <div class="tool">
-                                    <strong>Přidat listy</strong>
-                                    <div class="prop-row" style="margin-top:6px">
-                                        <button type="button" id="pickBtn" class="btn btn-sm btn-primary">Vybrat oblast na mapě</button>
-                                        <label>Ř</label><input type="number" id="rows" min="1" value="1"/>
-                                        <label>S</label><input type="number" id="cols" min="1" value="1"/>
-                                    </div>
-                                    <div class="hint">Klikni „Vybrat oblast", pak <strong>táhni myší</strong> nebo <strong>klikni dva rohy</strong>. Ř×S = řádky × sloupce (1×1 = jeden list).</div>
-                                    <span id="pickStatus"></span>
-                                    <div class="prop-row" style="margin-top:6px">
-                                        <button type="button" id="undoBtn" class="btn btn-sm btn-default"><i class="fas fa-undo"></i> Zpět</button>
-                                    </div>
-                                </div>
-                                <div id="colMgr" class="tool"></div>
-                            </div>
+                        <div class="grid-preview" id="gridPreview"></div>
+                        <div class="hint" th:if="${sameGrid != null and !sameGrid.isEmpty()}">
+                            Na stejné mřížce jsou i série:
+                            <span th:each="x, st : ${sameGrid}"><a th:href="@{/admin/series/edit(name=${x.name()})}" th:text="${x.prettyName()}"></a><span th:unless="${st.last}">, </span></span>
                         </div>
-                        <p class="hint" style="margin-top:8px">
-                            Klik na list = úprava (rohy táhni pro velikost, zelený úchyt nahoře pro <strong>rotaci</strong>;
-                            Shift/Ctrl = rotace po 15°). Najetí myší nabídne prázdné sousedy „+". Ctrl/Cmd+Z = zpět.
-                        </p>
-                        <div class="ws-card" id="selCard" style="margin-top:10px">
-                            <div class="ws-body" style="padding:12px 14px">
-                                <strong>Vybraný list</strong>
-                                <div id="props"><p class="hint">Klikni na list na mapě — jeho údaje, souřadnice a rotace se ukážou tady a půjdou upravit.</p></div>
-                            </div>
-                        </div>
-                        <details class="ws-card" id="tableSection" style="margin-top:10px">
-                            <summary style="padding:8px 10px">Tabulka všech listů <span class="sub">— hromadná úprava atributů</span></summary>
-                            <div class="ws-body" style="padding-top:8px">
-                                <div class="hint" style="margin-bottom:6px">Uprav hodnoty přímo v tabulce. Klik na číslo listu ho vybere i na mapě. V hlavičce sloupce lze hodnotu hromadně vyplnit/vymazat.</div>
-                                <div style="margin-bottom:6px">
-                                    <button type="button" id="tableFindBtn" class="btn btn-sm btn-default" disabled><i class="fas fa-crosshairs"></i> Najít vybraný list</button>
-                                    <span class="hint">— posune tabulku na list, který máš vybraný na mapě</span>
-                                </div>
-                                <div id="sheetTableWrap" class="sheet-table-wrap"></div>
-                            </div>
-                        </details>
-                        <details class="ws-card" id="rawSection" style="margin-top:10px">
-                            <summary style="padding:8px 10px">Pokročilé: upravit GeoJSON jako text <span class="sub">— pro ruční/hromadné zásahy</span></summary>
-                            <div class="ws-body" style="padding-top:8px">
-                                <div class="hint" style="margin-bottom:6px">Načte aktuální mřížku jako text. Po úpravě klikni „Použít do mapy" — proběhne validace a mapa se překreslí. <strong>Načíst z mapy</strong> vezme aktuální stav zpět do textu.</div>
-                                <div style="margin-bottom:6px">
-                                    <button type="button" id="rawReload" class="btn btn-sm btn-default">Načíst z mapy</button>
-                                    <button type="button" id="rawApply" class="btn btn-sm btn-primary">Použít do mapy</button>
-                                    <span id="rawMsg" class="hint"></span>
-                                </div>
-                                <textarea id="rawText" spellcheck="false" style="width:100%;height:36vh;font-family:monospace;font-size:12px"></textarea>
-                            </div>
-                        </details>
                     </div>
                 </details>
 
-                <!-- ③ KATALOGIZAČNÍ ŠABLONA -->
-                <details class="ws-card" id="tplSection">
-                    <summary><span class="ws-num">3</span> Katalogizační šablona <span class="sub">— nepovinné, můžeš přeskočit</span></summary>
+                <!-- ③ MAPOVÉ DÍLO, KTERÉ SÉRII PLNÍ -->
+                <details class="ws-card" open="open" th:if="${mode != 'new'}">
+                    <summary><span class="ws-num">3</span> Odkud se série plní <span class="sub">— katalogizace</span></summary>
                     <div class="ws-body">
-                        <div class="help"><i class="help-i">i</i>MARC21 šablona, ze které katalog skládá záznam pro Aleph. Ve formuláři upravíte nabídky (korporace a co k nim patří); celý text je v záložce „Text šablony“.</div>
-                        <div class="upload-row">
-                            <label>Nahrát šablonu (.txt): </label>
-                            <input type="file" id="tplUpload" accept=".txt,text/plain"/>
-                            <span class="help" style="display:inline">— nahraný soubor se hned zobrazí a jde upravit</span>
-                        </div>
-                        <div class="tpl-tabs">
-                            <button type="button" class="active" data-tab="tplForm">Formulář</button>
-                            <button type="button" data-tab="tplTextTab">Text šablony (pokročilé)</button>
-                        </div>
-                        <div id="tplForm"></div>
-                        <div class="tpl-layout" id="tplTextTab" style="display:none">
-                            <div class="tpl-col">
-                                <h5>Text šablony <span class="hint" id="synMsg"></span></h5>
-                                <div class="tpl-editor">
-                                    <pre id="tplBackdrop" aria-hidden="true"></pre>
-                                    <textarea id="tplText" spellcheck="false"></textarea>
-                                </div>
-                            </div>
-                            <div class="tpl-col">
-                                <h5>Náhled polí <span class="hint" id="fieldCount"></span></h5>
-                                <div class="tpl-preview" id="preview"></div>
-                            </div>
-                        </div>
+                        <div class="help"><i class="help-i">i</i>Na webu se v sérii objeví záznamy z Alephu, které mají v poli 490 přesně její název. Ten do záznamu zapisuje šablona mapového díla; šablony se upravují v <a th:href="@{/admin/works}">Mapových dílech</a>.</div>
+                        <ul th:if="${!fillingWorks.isEmpty()}" class="link-list">
+                            <li th:each="w : ${fillingWorks}">✔ mapové dílo <a th:href="@{/admin/works/edit(layer=${w.layer()})}" th:text="${w.name()}"></a> zapisuje tento název — <a th:href="@{/admin/works/edit(layer=${w.layer()})}">upravit jeho šablonu</a></li>
+                        </ul>
+                        <p th:if="${fillingWorks.isEmpty()}" class="use-box warn">⚠ Žádné mapové dílo pro katalogizaci nezapisuje do pole 490 přesně „<span th:text="${f_name}"></span>“. Záznamy této série vznikly jinak (dřív než catalog, nebo s ručně upraveným polem 490).</p>
                     </div>
                 </details>
 
                 <!-- ④ NAPOJENÍ NA KATALOG (technické) -->
                 <details class="ws-card ws-advanced">
-                    <summary><span class="ws-num">4</span> Napojení na katalog <span class="sub">(technické — předvyplněno)</span></summary>
+                    <summary><span class="ws-num" th:text="${mode == 'new'} ? 3 : 4">4</span> Párování záznamů z Alephu <span class="sub">(technické — předvyplněno)</span></summary>
                     <div class="ws-body">
-                        <div class="help"><i class="help-i">i</i>Tady se nastavuje, jak katalog pozná, že mapa patří do této série a který je to list.</div>
+                        <div class="help"><i class="help-i">i</i>Tady se nastavuje, jak web pozná, že záznam z Alephu patří do této série a který je to list.</div>
+                        <p class="hint">Název série web hledá v poli <code>490 $a</code> a číslo listu v poli <code>490 $v</code> — u všech sérií stejně.</p>
+                        <input type="hidden" name="field" th:value="${f_field}"/>
+                        <input type="hidden" name="sheets" th:value="${f_sheets}"/>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label>Název série je v MARC poli</label>
-                                    <div class="help">Kde katalog hledá název série (obvykle <code>490a</code>).</div>
-                                    <input type="text" class="form-control" name="field" th:value="${f_field}"/>
-                                </div>
-                                <div class="form-group">
-                                    <label>Číslo listu je v MARC poli</label>
-                                    <div class="help">Kde katalog hledá číslo/svazek listu (obvykle <code>490v</code>).</div>
-                                    <input type="text" class="form-control" name="sheets" th:value="${f_sheets}"/>
-                                </div>
-                                <div class="form-group">
-                                    <label>Soubor mapy (grid)</label>
-                                    <div class="help">Název souboru s mřížkou. Navrhne se podle názvu série; přepiš jen když chceš sdílet mřížku s jinou sérií.</div>
-                                    <input type="text" class="form-control" name="grid" th:value="${f_grid}" required="required"/>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
                                     <label>Jak z čísla listu udělat ID listu</label>
-                                    <div class="help">Číslo listu v záznamu bývá delší, než je vlastní ID (např. <code>7162, 1885</code>). Tímhle z něj vyřízneš čisté ID listu (<code>7162</code>), které sedí na mřížku.</div>
+                                    <div class="help">V poli 490 $v záznamu bývá víc než jen číslo listu, např. <code>7162, 1885</code>. Web z něj podle tohoto pravidla vyřízne číslo listu a najde k němu obdélníček v mřížce. Výsledek musí vypadat jako čísla listů v mřížce<span id="gbGridIds"></span>.</div>
                                     <label class="gb-opt"><input type="radio" name="gbMode" value="prefix"/> Prvních
                                         <input type="number" id="gbN" min="1" value="4" style="width:56px"/> znaků
                                         <code class="gb-ex" id="gbExPrefix"></code></label>
@@ -420,6 +141,15 @@
                         </div>
                     </div>
                 </details>
+
+                <div class="danger-zone" th:if="${mode != 'new'}">
+                    <form method="post" th:action="@{/admin/series/delete}"
+                          onsubmit="return confirm('Opravdu smazat tuto sérii z webu? Záznamy v Alephu ani mřížka se nesmažou, jen se série přestane na webu zobrazovat.');">
+                        <input type="hidden" name="name" th:value="${originalName}"/>
+                        <button type="submit" class="btn-outline-danger-sm"><i class="fas fa-trash"></i> Smazat sérii z webu…</button>
+                        <span class="hint">Záznamy v Alephu ani mřížka se nesmažou.</span>
+                    </form>
+                </div>
 
                 <div id="saveBar">
                     <button type="button" id="saveBtn" class="btn btn-success btn-lg"><i class="fas fa-save"></i> Uložit sérii</button>
@@ -443,16 +173,6 @@
     var initialGrid = ws.getAttribute("data-grid") || "";
 
     var $ = function (sel) { return document.querySelector(sel); };
-    var mapApi = null, tplApi = null, formApi = null;
-
-    // Tell the column manager which columns the template needs (its {"attr":"…"} keys),
-    // so it can offer to add the missing ones.
-    function updateSuggested() {
-        if (!mapApi || !tplApi) { return; }
-        var txt = tplApi.getText(), re = /"attr"\s*:\s*"([^"]+)"/g, m, set = {};
-        while ((m = re.exec(txt)) !== null) { set[m[1]] = true; }
-        mapApi.suggestColumns(Object.keys(set));
-    }
 
     // ---------- ① thumbnail live preview ----------
     var thumbUrl = document.getElementById("thumbUrl");
@@ -465,217 +185,21 @@
     thumbImg.addEventListener("error", function () { thumbImg.style.display = "none"; });
     refreshThumb();
 
-    // ---------- ② grid: lazy-init map on first open ----------
-    var gridSection = document.getElementById("gridSection");
-    var gridSub = document.getElementById("gridSub");
-    function initMap(cb) {
-        if (mapApi) { mapApi.invalidateSize(); if (cb) { cb(); } return; }
-        var done = function (gj) { mapApi = SheetMapEditor.init({ initialGeojson: gj, onSelect: onSheetSelect }); mapApi.invalidateSize(); updateSuggested(); if (cb) { cb(); } };
-        if (mode !== "new" && initialGrid) {
-            fetch("/admin/series/sheets/data?grid=" + encodeURIComponent(initialGrid))
-                .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (gj) { done(gj); })
-                .catch(function () { done(null); });
-        } else { done(null); }
-    }
-    // like initMap, but when the map already exists don't invalidateSize/fit — used by
-    // the table & raw sections (nested under the already-open map section) so opening
-    // them never jolts the map view or reloads tiles.
-    function ensureEditor(cb) { if (mapApi) { if (cb) { cb(); } return; } initMap(cb); }
-    // selecting a sheet on the map enables the jump buttons (no auto-scroll)
-    var gotoDetail = document.getElementById("gotoDetail"), selInfo = document.getElementById("selInfo");
-    var tableFindBtn = document.getElementById("tableFindBtn");
-    function onSheetSelect(feature) {
-        var has = !!feature;
-        gotoDetail.disabled = !has;
-        tableFindBtn.disabled = !has;
-        selInfo.textContent = has ? "vybrán list " + ((feature.properties || {}).SHEET || (feature.properties || {}).TITLE || "—") : "";
-    }
-    gotoDetail.addEventListener("click", function () {
-        var card = document.getElementById("selCard");
-        if (card && card.scrollIntoView) { card.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    // ---------- ② grid: the link follows the choice, a preview shows it ----------
+    var gridSelect = document.getElementById("gridSelect");
+    var preview = document.getElementById("gridPreview");
+    GridPreview.bind(gridSelect, preview);
+    preview.addEventListener("gridloaded", function () {
+        var ids = (preview.getAttribute("data-sample-ids") || "").split("|").filter(Boolean);
+        document.getElementById("gbGridIds").textContent = ids.length ? " (" + ids.slice(0, 4).join(", ") + ")" : "";
+    });
+    gridSelect.addEventListener("change", function () {
+        var link = document.getElementById("gridEditLink");
+        if (link) { link.href = "/admin/grids/edit?name=" + encodeURIComponent(gridSelect.value); link.style.display = gridSelect.value ? "" : "none"; }
     });
 
-    gridSection.addEventListener("toggle", function () { if (gridSection.open) { initMap(); } });
-    // Read a dropped/picked file, convert via GeoImport, draw it on the map.
-    function loadGridFile(file) {
-        if (!file) { return; }
-        var reader = new FileReader();
-        reader.onload = function () {
-            var gj;
-            try { gj = GeoImport.parse(file.name, reader.result); }
-            catch (err) { alert("Nešlo načíst soubor: " + err.message); return; }
-            if (!gridSection.open) { gridSection.open = true; }
-            initMap(function () { mapApi.setGeojson(gj); });
-        };
-        reader.readAsText(file);
-    }
-    var gridUpload = document.getElementById("gridUpload");
-    if (window.GeoImport) { gridUpload.setAttribute("accept", GeoImport.ACCEPT); }
-    gridUpload.addEventListener("change", function (e) {
-        loadGridFile(e.target.files[0]);
-        e.target.value = "";   // allow re-uploading the same file
-    });
-
-    // drag & drop a file anywhere on the map area
-    var dropZone = document.querySelector(".sheets-map");
-    if (dropZone) {
-        ["dragenter", "dragover"].forEach(function (ev) {
-            dropZone.addEventListener(ev, function (e) {
-                if (e.dataTransfer) { e.dataTransfer.dropEffect = "copy"; }
-                e.preventDefault(); e.stopPropagation(); dropZone.classList.add("dragover");
-            });
-        });
-        ["dragleave", "dragend"].forEach(function (ev) {
-            dropZone.addEventListener(ev, function (e) {
-                e.preventDefault(); e.stopPropagation();
-                if (ev === "dragleave" && dropZone.contains(e.relatedTarget)) { return; }
-                dropZone.classList.remove("dragover");
-            });
-        });
-        dropZone.addEventListener("drop", function (e) {
-            e.preventDefault(); e.stopPropagation(); dropZone.classList.remove("dragover");
-            loadGridFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
-        });
-    }
-
-    // ---------- ② grid: export / download ----------
-    var exportSel = document.getElementById("exportFormat");
-    if (window.GeoExport && exportSel) {
-        GeoExport.FORMATS.forEach(function (f) {
-            var o = document.createElement("option"); o.value = f.key; o.textContent = f.label; exportSel.appendChild(o);
-        });
-    }
-    document.getElementById("exportBtn").addEventListener("click", function () {
-        if (!mapApi || !mapApi.hasFeatures()) { alert("Mřížka je prázdná — není co stáhnout."); return; }
-        var name = (gridInput && gridInput.value ? gridInput.value : "grid").trim() || "grid";
-        try { GeoExport.download(exportSel.value, mapApi.getGeojson(), name); }
-        catch (err) { alert("Export selhal: " + err.message); }
-    });
-
-    // ---------- ② grid: bulk table view ----------
-    var tableSection = document.getElementById("tableSection");
-    var tableMounted = false;
-    function ensureTableMounted(cb) {
-        ensureEditor(function () {
-            if (!tableMounted) { mapApi.mountTable(document.getElementById("sheetTableWrap")); tableMounted = true; }
-            if (cb) { cb(); }
-        });
-    }
-    tableSection.addEventListener("toggle", function () { if (tableSection.open) { ensureTableMounted(); } });
-    tableFindBtn.addEventListener("click", function () {
-        if (!mapApi || !mapApi.hasSelected()) { alert("Nejdřív klikni na list na mapě."); return; }
-        if (!tableSection.open) { tableSection.open = true; }
-        ensureTableMounted(function () {
-            tableSection.scrollIntoView({ behavior: "smooth", block: "start" });
-            // let the section scroll settle, then bring the selected row into view + flash it
-            setTimeout(function () { mapApi.scrollToSelectedRow(); }, 350);
-        });
-    });
-
-    // ---------- ② grid: raw GeoJSON text editor ----------
-    var rawSection = document.getElementById("rawSection");
-    var rawText = document.getElementById("rawText"), rawMsg = document.getElementById("rawMsg");
-    function rawLoadFromMap() {
-        rawMsg.className = "hint"; rawMsg.textContent = "";
-        var gj = mapApi ? mapApi.getGeojson() : { type: "FeatureCollection", features: [] };
-        rawText.value = JSON.stringify(gj, function (k, v) { return k === "_template" ? undefined : v; }, 2);
-    }
-    rawSection.addEventListener("toggle", function () {
-        if (!rawSection.open) { return; }
-        ensureEditor(function () { rawLoadFromMap(); });
-    });
-    document.getElementById("rawReload").addEventListener("click", rawLoadFromMap);
-    document.getElementById("rawApply").addEventListener("click", function () {
-        var gj;
-        try { gj = JSON.parse(rawText.value); }
-        catch (err) { rawMsg.className = "hint err"; rawMsg.textContent = "✕ Neplatný JSON: " + err.message; return; }
-        if (!gj || gj.type !== "FeatureCollection" || !Array.isArray(gj.features)) {
-            rawMsg.className = "hint err"; rawMsg.textContent = "✕ Musí to být GeoJSON FeatureCollection (type + features[])."; return;
-        }
-        ensureEditor(function () {
-            mapApi.setGeojson(gj);
-            rawMsg.className = "hint ok"; rawMsg.textContent = "✔ Použito — mřížka má " + gj.features.length + " listů.";
-        });
-    });
-
-    // ---------- ③ template: lazy-init on first open ----------
-    var tplSection = document.getElementById("tplSection");
-    var tplWaiting = null;   // callbacks while the template is loading (it loads once)
-    function initTpl(cb) {
-        if (tplApi) { if (cb) { cb(); } return; }
-        if (tplWaiting) { if (cb) { tplWaiting.push(cb); } return; }
-        tplWaiting = cb ? [cb] : [];
-        var done = function (txt) {
-            tplApi = TemplateEditor.init({ initialText: txt || "", onChange: function () {
-                updateSuggested();
-                if (formApi) { formApi.refresh(); }
-            } });
-            formApi = TemplateForm.init({ container: document.getElementById("tplForm"),
-                getText: tplApi.getText, setText: tplApi.setText });
-            var waiting = tplWaiting;
-            tplWaiting = null;
-            waiting.forEach(function (f) { f(); });
-        };
-        if (mode !== "new" && initialGrid) {
-            fetch("/admin/series/template/data?grid=" + encodeURIComponent(initialGrid))
-                .then(function (r) { return r.ok ? r.text() : ""; })
-                .then(function (txt) { done(txt); })
-                .catch(function () { done(""); });
-        } else { done(""); }
-    }
-    tplSection.addEventListener("toggle", function () { if (tplSection.open) { initTpl(); } });
-
-    // A value the cataloguer used that the template lacks ("Přidat do šablony" in
-    // the catalogue): prepare it as a row of the template form, to check and save.
-    (function () {
-        var KEY = "mapseries.templateAddition", add = null;
-        try { add = JSON.parse(localStorage.getItem(KEY)); } catch (e) { return; }
-        if (!add || mode === "new" || add.grid !== initialGrid || Date.now() - add.created > 24 * 3600 * 1000) { return; }
-        localStorage.removeItem(KEY);
-        tplSection.open = true;
-        initTpl(function () {
-            var done = formApi.prefill(add);
-            var banner = document.createElement("div");
-            banner.className = "tf-banner";
-            banner.textContent = done
-                ? "Z katalogizace" + (add.sheet ? " listu " + add.sheet : "") + ": " + done +
-                  " (označený zeleně). Zkontrolujte ho, doplňte chybějící hodnoty a uložte tlačítkem „Uložit sérii“."
-                : "Návrh z katalogu se do této šablony nepodařilo vložit.";
-            var form = document.getElementById("tplForm");
-            form.insertBefore(banner, form.firstChild);
-            tplSection.scrollIntoView({ block: "start" });
-        });
-    })();
-    document.querySelectorAll(".tpl-tabs button").forEach(function (tab) {
-        tab.addEventListener("click", function () {
-            document.querySelectorAll(".tpl-tabs button").forEach(function (b) {
-                b.classList.toggle("active", b === tab);
-                document.getElementById(b.getAttribute("data-tab")).style.display = b === tab ? "" : "none";
-            });
-        });
-    });
-    document.getElementById("tplUpload").addEventListener("change", function (e) {
-        var file = e.target.files[0]; if (!file) { return; }
-        var reader = new FileReader();
-        reader.onload = function () {
-            if (!tplSection.open) { tplSection.open = true; }
-            initTpl(function () { tplApi.setText(reader.result); });
-        };
-        reader.readAsText(file);
-    });
-
-    // ---------- ④ advanced: grid auto-slug + groupby ----------
-    var nameInput = $("[name=name]"), gridInput = $("[name=grid]");
-    function slugify(s) {
-        return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
-            .replace(/[\[\];:]/g, " ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-    }
-    if (mode === "new") {
-        nameInput.addEventListener("input", function () { if (!gridInput.getAttribute("data-touched")) { gridInput.value = slugify(nameInput.value); } });
-        gridInput.addEventListener("input", function () { gridInput.setAttribute("data-touched", "1"); });
-        if (!gridInput.value) { gridInput.value = slugify(nameInput.value); }
-    }
+    // ---------- ④ advanced: groupby ----------
+    var nameInput = $("[name=name]"), gridInput = gridSelect;
 
     var gbN = document.getElementById("gbN"), gbCustom = document.getElementById("gbCustom");
     var gbTestIn = document.getElementById("gbTestIn"), gbTestOut = document.getElementById("gbTestOut");
@@ -730,15 +254,11 @@
             field: ($("[name=field]").value || "").trim(),
             sheets: ($("[name=sheets]").value || "").trim(),
             groupby: currentGroupby(),
-            grid: (gridInput.value || "").trim(),
-            geojson: mapApi ? JSON.stringify(mapApi.getGeojson(), function (k, v) { return k === "_template" ? undefined : v; }, 2) : null,
-            template: tplApi ? tplApi.getText() : null
+            grid: (gridInput.value || "").trim()
         };
-        if (!payload.name) { return fail("Vyplň název série."); }
-        if (!payload.grid) { return fail("Vyplň „Soubor mapy (grid)\" v sekci Napojení."); }
-        if (!payload.field || !payload.sheets || !payload.groupby) { return fail("Vyplň pole v sekci Napojení na katalog."); }
-        if (mode === "new" && (!mapApi || !mapApi.hasFeatures())) { return fail("Nakresli nebo nahraj alespoň jeden list mřížky (sekce 2)."); }
-        if (tplApi && !tplApi.isValid()) { return fail("Šablona má neplatný JSON blok — oprav ho (sekce 3)."); }
+        if (!payload.name) { return fail("Vyplňte název série."); }
+        if (!payload.grid) { return fail("Vyberte mřížku listů (sekce 2)."); }
+        if (!payload.field || !payload.sheets || !payload.groupby) { return fail("Vyplňte pravidlo v sekci Párování záznamů z Alephu."); }
 
         msg.textContent = "Ukládám…"; msg.style.color = "";
         fetch("/admin/series/save", {

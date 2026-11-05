@@ -193,7 +193,7 @@ window.SheetMapEditor = (function () {
             var html = '<strong>Atributy listů</strong>' +
                 '<div class="hint">Údaje, které nese každý list (např. TITLE, autor). Šablona je tahá přes <code>attr</code> (např. N245A).</div>';
             if (!(geojson.features || []).length) {
-                html += '<div class="hint">Nejdřív vytvoř aspoň jeden list, pak sem přidávej atributy.</div>';
+                html += '<div class="hint">Nejdřív vytvořte aspoň jeden list, pak sem přidávejte atributy.</div>';
             }
             keys.forEach(function (k) {
                 html += '<div class="col-row"><span class="cname">' + esc(k) + '</span>' +
@@ -684,11 +684,11 @@ window.SheetMapEditor = (function () {
             if (fit && count) { try { map.fitBounds(gridLayer.getBounds()); } catch (e) { /* ignore */ } }
             var gridSub = document.getElementById("gridSub");
             if (gridSub) {
-                gridSub.textContent = count ? "— " + count + " listů" : "— nakresli na mapě nebo nahraj soubor";
+                gridSub.textContent = count ? "— " + count + " listů" : "— nakreslete na mapě nebo nahrajte soubor";
             }
             props.innerHTML = count
-                ? '<p class="hint">Klikni na list na mapě — jeho údaje, souřadnice a rotace se ukážou tady a půjdou upravit.</p>'
-                : '<p class="hint">Zatím žádné listy — vytvoř první obdélník, nebo vygeneruj mřížku (panel vpravo).</p>';
+                ? '<p class="hint">Klikněte na list na mapě — jeho údaje, souřadnice a rotace se ukážou tady a půjdou upravit.</p>'
+                : '<p class="hint">Zatím žádné listy — vytvořte první obdélník, nebo vygenerujte mřížku (panel vpravo).</p>';
             updateLabels();
             renderColumns();
             renderTable();
@@ -719,7 +719,7 @@ window.SheetMapEditor = (function () {
         // ---- create: one unified tool — pick an area (drag OR click-click), then
         //      fill it with a rows×cols grid (1×1 = a single sheet). ----
         document.getElementById("pickBtn").addEventListener("click", function () {
-            document.getElementById("pickStatus").textContent = "táhni myší nebo klikni dva rohy…";
+            document.getElementById("pickStatus").textContent = "táhněte myší nebo klikněte na dva rohy…";
             pickArea(function (bounds) {
                 document.getElementById("pickStatus").textContent = "";
                 var rows = parseInt(document.getElementById("rows").value, 10) || 1;

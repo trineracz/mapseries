@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/series-editor/editor.css(v=3)}"/>
+    <script type="text/javascript" th:src="@{/assets/series-editor/save-bar.js(v=1)}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/template-editor.js(v=4)}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/template-form.js(v=4)}"></script>
+
+    <div class="container-fluid">
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+        <div id="ws" th:unless="${error}" th:attr="data-layer=${work.layer()}">
+            <a class="btn btn-link" th:href="@{/admin/works}"><i class="fas fa-arrow-left"></i> Mapová díla</a>
+            <h3 th:text="${work.name()}"></h3>
+            <p class="hint" th:text="${work.region()} + ' · klad listů: ' + ${work.klad()}"></p>
+
+            <!-- where the sheets end up on the web -->
+            <div class="use-box" th:classappend="${field490 != null and field490.serie() != null} ? 'ok' : 'warn'">
+                <th:block th:if="${field490 == null}">⚠ Šablona nezapisuje pole 490, takže web listy tohoto díla nikam nezařadí.</th:block>
+                <th:block th:if="${field490 != null and field490.serie() != null}">
+                    ✔ Šablona zapisuje do pole 490 <code th:text="${field490.value()}"></code> — listy se na webu zobrazují
+                    v sérii <a th:href="@{/admin/series/edit(name=${field490.serie().name()})}" th:text="${field490.serie().prettyName()}"></a>.
+                </th:block>
+                <th:block th:if="${field490 != null and field490.serie() == null}">
+                    ⚠ Šablona zapisuje do pole 490 <code th:text="${field490.value()}"></code>. Série s tímto názvem
+                    na webu není, takže se listy tohoto díla na webu nezobrazí.
+                    <span th:if="${#strings.contains(field490.value(), 'Franzisco-Josephinische')}">Název vypadá jako pozůstatek ze vzorové šablony — ověřte, zda je správný (opravuje se v textu šablony, řádek 490).</span>
+                    <div style="margin-top:6px"><a th:href="@{/admin/series/new(name=${field490.value()}, grid=${work.layer()})}">Založit sérii s tímto názvem</a></div>
+                </th:block>
+            </div>
+
+
+            <div class="ws-card" id="tplSection">
+                <div class="ws-body" style="padding-top:12px">
+                    <h4 style="margin-top:0">Šablona <span class="hint" th:text="${work.template()}"></span></h4>
+                    <div class="help"><i class="help-i">i</i>Šablona určuje, co katalogizační nástroj při katalogizaci listu tohoto díla nabídne a doplní. Ve formuláři upravíte nabídky (korporace a co k nim patří); celý text je v záložce „Text šablony“.</div>
+                    <div th:unless="${templateExists}" class="use-box warn">Šablona tohoto díla zatím neexistuje — vložte ji nebo nahrajte ze souboru v záložce „Text šablony“.</div>
+                    <div class="tpl-tabs">
+                        <button type="button" class="active" data-tab="tplForm">Formulář</button>
+                        <button type="button" data-tab="tplTextTab">Text šablony (pokročilé)</button>
+                    </div>
+                    <div id="tplForm"></div>
+                    <div class="tpl-layout" id="tplTextTab" style="display:none">
+                        <div class="tpl-col">
+                            <div class="upload-row" style="margin-bottom:6px">
+                                <label for="tplUpload">Nahradit šablonou ze souboru (.txt): </label>
+                                <input type="file" id="tplUpload" accept=".txt,text/plain"/>
+                            </div>
+                            <h5>Text šablony <span class="hint" id="synMsg"></span></h5>
+                            <div class="tpl-editor">
+                                <pre id="tplBackdrop" aria-hidden="true"></pre>
+                                <textarea id="tplText" spellcheck="false"></textarea>
+                            </div>
+                        </div>
+                        <div class="tpl-col">
+                            <h5>Náhled polí <span class="hint" id="fieldCount"></span></h5>
+                            <div class="tpl-preview" id="preview"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="saveBar">
+                <button type="button" id="saveBtn" class="btn btn-success btn-lg"><i class="fas fa-save"></i> Uložit šablonu</button>
+                <span id="saveMsg"></span>
+            </div>
+        </div>
+    </div>
+
+    <script th:if="${error == null}" th:inline="none">
+    (function () {
+        var ws = document.getElementById("ws");
+        if (!ws) { return; }
+        var layer = ws.getAttribute("data-layer");
+        var tplApi = null, formApi = null;
+
+        function start(txt) {
+            tplApi = TemplateEditor.init({ initialText: txt || "", onChange: function () { if (formApi) { formApi.refresh(); } } });
+            formApi = TemplateForm.init({ container: document.getElementById("tplForm"), getText: tplApi.getText, setText: tplApi.setText });
+            prefillFromCatalogue();
+        }
+        fetch("/admin/works/template/data?layer=" + encodeURIComponent(layer))
+            .then(function (r) { return r.ok ? r.text() : ""; })
+            .then(start)
+            .catch(function () { start(""); });
+
+        document.querySelectorAll(".tpl-tabs button").forEach(function (tab) {
+            tab.addEventListener("click", function () {
+                document.querySelectorAll(".tpl-tabs button").forEach(function (b) {
+                    b.classList.toggle("active", b === tab);
+                    document.getElementById(b.getAttribute("data-tab")).style.display = b === tab ? "" : "none";
+                });
+            });
+        });
+        document.getElementById("tplUpload").addEventListener("change", function (e) {
+            var file = e.target.files[0]; if (!file || !tplApi) { return; }
+            var reader = new FileReader();
+            reader.onload = function () { tplApi.setText(reader.result); };
+            reader.readAsText(file);
+        });
+
+        // A value the cataloguer used that the template lacks ("+ přidat do šablony" in
+        // the catalogue): prepare it as a row of the form, to check and save.
+        function prefillFromCatalogue() {
+            var KEY = "mapseries.templateAddition", add = null;
+            try { add = JSON.parse(localStorage.getItem(KEY)); } catch (e) { return; }
+            if (!add || add.grid !== layer || Date.now() - add.created > 24 * 3600 * 1000) { return; }
+            try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+            var done = formApi.prefill(add);
+            var banner = document.createElement("div");
+            banner.className = "tf-banner";
+            banner.textContent = done
+                ? "Z katalogizace" + (add.sheet ? " listu " + add.sheet : "") + ": " + done +
+                  " (označený zeleně). Zkontrolujte ho, doplňte chybějící hodnoty a uložte tlačítkem „Uložit šablonu“."
+                : "Návrh z katalogizace se do této šablony nepodařilo vložit.";
+            var form = document.getElementById("tplForm");
+            form.insertBefore(banner, form.firstChild);
+        }
+
+        var msg = document.getElementById("saveMsg");
+        function fail(m) { msg.textContent = "✕ " + m; msg.style.color = "#b23a2e"; }
+        document.getElementById("saveBtn").addEventListener("click", function () {
+            if (!tplApi) { return; }
+            if (!tplApi.isValid()) { return fail("Šablona má neplatný JSON blok — opravte ho v záložce Text šablony."); }
+            msg.textContent = "Ukládám…"; msg.style.color = "";
+            fetch("/admin/works/save", { method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ layer: layer, template: tplApi.getText() }) })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (!res.success) { return fail(res.message); }
+                msg.style.color = "#2e7d32";
+                if (res.prUrl) {
+                    msg.innerHTML = "✔ " + res.message.replace(/</g, "&lt;") +
+                        ' <a href="' + res.prUrl + '" target="_blank" rel="noopener">otevřít návrh změny ↗</a>';
+                } else { msg.textContent = "✔ " + res.message; }
+            })
+            .catch(function (e) { fail(e.message); });
+        });
+    })();
+    </script>
+</div>
+</body>
+</html>

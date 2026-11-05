@@ -1,0 +1,224 @@
+/* Shared styles of the admin editors (série, mapová díla, mřížky). */
+    .ws-card { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 14px; background: #fff; }
+    .ws-card > summary { cursor: pointer; font-weight: bold; font-size: 15px; padding: 12px 14px;
+        outline: none; list-style: none; }
+    .ws-card > summary::-webkit-details-marker { display: none; }
+    .ws-card > summary::before { content: "▸ "; color: #888; }
+    .ws-card[open] > summary::before { content: "▾ "; }
+    .ws-card > summary .sub { font-weight: normal; color: #888; font-size: 13px; margin-left: 6px; }
+    .ws-body { padding: 0 14px 14px; }
+    .ws-num { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center;
+        background: #3388ff; color: #fff; border-radius: 50%; font-size: 12px; margin-right: 6px; }
+    .ws-advanced { background: #f6f7f9; }
+    .ws-advanced .ws-body { color: #444; }
+    .help { color: #777; font-size: 12px; margin: 2px 0 8px; }
+    .help-i { display: inline-block; width: 15px; height: 15px; line-height: 15px; text-align: center;
+        border-radius: 50%; background: #bbb; color: #fff; font-size: 11px; font-style: normal; margin-right: 4px; }
+    .upload-row { margin: 6px 0 10px; }
+    .thumb-preview { max-height: 90px; border: 1px solid #ddd; margin-top: 6px; display: none; }
+
+    /* sheet map editor */
+    .sheets-layout { display: flex; gap: 16px; align-items: stretch; }
+    .sheets-map { flex: 1 1 auto; position: relative; }
+    .sheets-map.dragover::after { content: "Pusť soubor pro nahrání mřížky"; position: absolute; inset: 0;
+        z-index: 1200; display: flex; align-items: center; justify-content: center;
+        background: rgba(51,136,255,0.12); border: 3px dashed #3388ff; color: #24518c; font-weight: 700;
+        pointer-events: none; }
+    #map { height: 62vh; border: 1px solid #ccc; }
+    .sheets-side { flex: 0 0 360px; max-height: 62vh; overflow-y: auto; border: 1px solid #ccc; padding: 12px; }
+    .sheets-side .hint { color: #888; font-size: 13px; }
+    .prop-row { margin-bottom: 8px; }
+    /* selected-sheet detail below the map: lay attributes out in responsive columns */
+    #selCard .attr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 14px; }
+    #selCard #coordBox { margin-top: 8px; max-width: 560px; }
+    .prop-row label { display: block; font-size: 12px; color: #555; margin-bottom: 2px; }
+    .prop-row input, .prop-row textarea { width: 100%; }
+    .col-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+    .col-row .cname { flex: 1 1 auto; font-family: monospace; font-size: 12px; }
+    .sel { font-weight: bold; }
+    .tool { border: 1px solid #ddd; background: #fafafa; padding: 10px; margin-bottom: 12px; }
+    .tool input[type=number] { width: 64px; }
+    #pickStatus { font-size: 12px; color: #b23a2e; }
+    .leaflet-tooltip.sheet-label { background: transparent; border: none; box-shadow: none;
+        color: #1a1a1a; font-size: 10px; font-weight: 700; padding: 0; }
+    .leaflet-tooltip.sheet-label-md { font-size: 13px; }
+    .leaflet-tooltip.sheet-label-lg { font-size: 16px; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+    .ghost-plus { color: #2e7d32; font: 700 16px/20px sans-serif; text-align: center;
+        background: rgba(255,255,255,0.75); border: 1px solid #2e7d32; border-radius: 50%; }
+    .vhandle { background: #fff; border: 2px solid #b23a2e; border-radius: 2px; box-sizing: border-box; cursor: nwse-resize; }
+    .rothandle { background: #2e7d32; border: 2px solid #fff; border-radius: 50%; box-sizing: border-box; cursor: grab; }
+    .edgehandle { background: #fff; border: 2px solid #b23a2e; box-sizing: border-box; cursor: ew-resize; }
+    .movehandle { background: #3388ff; border: 2px solid #fff; border-radius: 50%; box-sizing: border-box; cursor: move; }
+
+    /* template editor */
+    .tpl-layout { display: flex; gap: 16px; align-items: stretch; }
+    .tpl-col { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
+    .tpl-col h5 { margin: 0 0 6px; }
+    .tpl-editor { position: relative; height: 44vh; }
+    #tplBackdrop, #tplText {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0; margin: 0;
+        font-family: monospace; font-size: 12px; line-height: 1.35; padding: 8px;
+        border: 1px solid #ccc; box-sizing: border-box; white-space: pre; overflow: auto; }
+    /* transparent border keeps the box metrics aligned with the textarea but draws
+       no visible line (a shorter opaque border used to strike through the text) */
+    #tplBackdrop { z-index: 1; background: #fff; color: transparent; pointer-events: none; border-color: transparent; }
+    #tplBackdrop mark { background: #ffd0d0; color: transparent; }
+    #tplText { z-index: 2; background: transparent; color: #222; resize: none; }
+    #tplText.bad { border-color: #b23a2e; }
+    #synMsg.ok { color: #2e7d32; }
+    #synMsg.err { color: #b23a2e; }
+    .tpl-preview { height: 44vh; overflow-y: auto; border: 1px solid #ccc; padding: 8px; background: #fafafa; }
+    .tpl-preview table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .tpl-preview th, .tpl-preview td { border-bottom: 1px solid #e5e5e5; padding: 4px 6px; text-align: left; vertical-align: top; }
+    .tpl-preview th { color: #555; font-weight: 600; }
+    .tpl-tag { font-family: monospace; color: #0b5; font-weight: 700; }
+    .tpl-type.ro { color: #999; }
+    .tpl-detail { font-family: monospace; color: #b26a00; }
+    .tpl-opts .more { color: #999; }
+    .badge-ro { background: #eee; color: #777; border-radius: 3px; font-size: 10px; padding: 1px 4px; margin-left: 4px; }
+    /* template form (template-form.js) */
+    .tpl-tabs { display: flex; gap: 4px; border-bottom: 1px solid #ccc; margin: 6px 0 10px; }
+    .tpl-tabs button { border: 1px solid #ccc; border-bottom: none; background: #f6f7f9; padding: 6px 14px;
+        border-radius: 4px 4px 0 0; margin-bottom: -1px; font-size: 13px; }
+    .tpl-tabs button.active { background: #fff; font-weight: 600; border-bottom: 1px solid #fff; }
+    .tf-card { border: 1px solid #e3e3e3; border-radius: 4px; padding: 10px 12px; margin-bottom: 14px; }
+    .tf-card h5 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+    .tf-section { font-size: 15px; margin: 18px 0 8px; }
+    .tf-where { font-family: monospace; font-size: 11px; color: #0b5; margin-left: 6px; font-weight: normal; }
+    th .tf-where { display: block; margin-left: 0; }
+    /* columns keep a readable width (text wraps, cells grow); a table wider
+       than the page scrolls sideways on its own, the page does not */
+    .tf-scroll { overflow-x: auto; margin: 6px 0 8px; }
+    table.tf-table { border-collapse: collapse; font-size: 12px; width: 100%; }
+    table.tf-table th.w-act { min-width: 80px; }
+    table.tf-table th.w-main { min-width: 220px; }
+    table.tf-table th.w-short { min-width: 64px; width: 64px; }
+    table.tf-table th.w-code { min-width: 110px; }
+    table.tf-table th.w-text { min-width: 170px; }
+    table.tf-table th.w-wide { min-width: 220px; }
+    table.tf-table th, table.tf-table td { border: 1px solid #e5e5e5; padding: 3px 5px; vertical-align: top;
+        overflow-wrap: break-word; }
+    table.tf-table th { background: #f6f7f9; text-align: left; font-weight: 600; overflow-wrap: normal;
+        hyphens: auto; -webkit-hyphens: auto; }
+    table.tf-table td textarea, table.tf-table td input { display: block; width: 100%; box-sizing: border-box;
+        border: 1px solid #d5d9de; border-radius: 2px; background: #fff; font-size: 12px; padding: 2px 4px;
+        font-family: monospace; resize: none; overflow: hidden; line-height: 1.35; }
+    table.tf-table td:has(input, textarea) { cursor: text; }
+    table.tf-table td input.tf-short { text-align: center; }
+    table.tf-table td textarea:hover, table.tf-table td input:hover { border-color: #9fb3c8; }
+    table.tf-table td textarea:focus, table.tf-table td input:focus { border-color: #3388ff; background: #fff; outline: none; }
+    table.tf-table tbody tr { background: #fff; }
+    table.tf-table tr.tf-flash td { animation: tf-flash 1.6s ease; }
+    @keyframes tf-flash { from { background: #fff3a8; } to { background: transparent; } }
+    table.tf-table tr.tf-leaving { opacity: 0; transition: opacity .3s ease; }
+    table.tf-table tr.tf-prefilled td.tf-num { box-shadow: inset 3px 0 0 #2e7d32; }
+    .tf-banner { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; padding: 8px 12px; margin-bottom: 10px; }
+    table.tf-table td.tf-bad { background: #fff1f0; box-shadow: inset 0 0 0 1px #e0605a; }
+    .tf-num { color: #999; text-align: right; }
+    .tf-main .tf-pick { margin: 2px 0 0; }
+    .tf-ident { font-family: monospace; margin-right: 6px; }
+    .tf-code { font-family: monospace; color: #888; font-size: 11px; margin-right: 6px; }
+    .tf-ro { color: #999; font-family: monospace; }
+    .tf-pick, .tf-clear, .tf-row-actions button { border: 1px solid #ccc; background: #fff; border-radius: 3px;
+        font-size: 11px; padding: 0 6px; margin-left: 2px; }
+    .tf-row-actions { white-space: nowrap; }
+    .tf-main .tf-ident { font-family: inherit; font-weight: 600; }
+    table.tf-table td input.tf-roles { display: inline-block; width: 90px; color: #b26a00; }
+    .tf-entry .tf-pick, .tf-entry .tf-clear { margin-top: 2px; }
+    .tf-problems { font-size: 12px; color: #b23a2e; }
+    .tf-problems ul { margin: 4px 0 0; padding-left: 18px; }
+    .tf-items { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+    .tf-item { border: 1px solid #ddd; border-radius: 3px; padding: 1px 2px 1px 4px; }
+    .tf-item input { border: none; font-family: monospace; font-size: 12px; width: 140px; outline: none; }
+    .tf-item { cursor: text; background: #fff; }
+    .tf-item:focus-within { border-color: #3388ff; }
+    .tf-list-long .tf-items { display: block; }
+    .tf-list-long .tf-item { display: flex; margin-bottom: 6px; }
+    .tf-list-long .tf-item input { flex: 1; width: auto; }
+    .tf-item .tf-del { border: none; background: none; color: #999; }
+    .tf-modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 3000; display: none;
+        align-items: flex-start; justify-content: center; padding-top: 10vh; }
+    .tf-dialog { background: #fff; border-radius: 6px; padding: 16px; width: 640px; max-width: 94vw;
+        max-height: 75vh; overflow: auto; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+    .tf-dialog h4 { margin: 0 0 10px; }
+    .tf-results { margin: 8px 0; }
+    .tf-result { display: block; width: 100%; text-align: left; border: none; border-bottom: 1px solid #eee;
+        background: #fff; padding: 6px 4px; font-size: 13px; }
+    .tf-result:hover { background: #eef5ff; }
+    .tf-var { display: block; color: #999; font-size: 11px; }
+    .tf-manual summary { cursor: pointer; color: #555; font-size: 13px; }
+    .tf-manual-body label { display: block; font-weight: normal; font-size: 12px; margin-top: 6px; }
+    .tf-buttons { text-align: right; margin-top: 10px; }
+    .hint { color: #888; font-size: 13px; }
+    .hint.ok { color: #2e7d32; }
+    .hint.err { color: #b23a2e; }
+
+    /* bulk sheet table */
+    .sheet-table-wrap { max-height: 50vh; overflow: auto; border: 1px solid #ddd; }
+    table.sheet-table { border-collapse: collapse; font-size: 12px; width: 100%; }
+    table.sheet-table th, table.sheet-table td { border: 1px solid #e5e5e5; padding: 2px 4px; }
+    table.sheet-table thead th { position: sticky; top: 0; background: #f6f7f9; z-index: 1; text-align: left; }
+    table.sheet-table th .cbar { display: flex; gap: 4px; align-items: center; }
+    table.sheet-table th .cbar .cn { font-family: monospace; }
+    table.sheet-table td input { width: 100%; border: 1px solid transparent; background: transparent; font-size: 12px; padding: 1px 2px; }
+    table.sheet-table td input:focus { border-color: #3388ff; background: #fff; }
+    table.sheet-table td.sheet-cell { white-space: nowrap; }
+    table.sheet-table th.loc-col, table.sheet-table td.loc-cell { width: 26px; padding: 0; text-align: center; }
+    table.sheet-table a.rowsel { display: inline-block; width: 100%; padding: 3px 0; cursor: pointer;
+        text-decoration: none; color: #3388ff; }
+    table.sheet-table a.rowsel:hover { background: #e8eefc; color: #24518c; }
+    table.sheet-table .colbtn { border: none; background: #e8eefc; color: #24518c; border-radius: 3px; font-size: 10px; padding: 0 4px; cursor: pointer; }
+    table.sheet-table tr.sel-row td { background: #dce8ff; }
+    table.sheet-table tr.row-flash td { background: #fff3cd; transition: background .3s ease; }
+
+    .gb-opt { display: block; margin: 4px 0; }
+    .gb-ex { color: #888; font-family: monospace; font-size: 12px; margin-left: 8px; }
+    .gb-test { background: #eef3ff; border: 1px solid #cdd9f5; padding: 6px 8px; border-radius: 4px; margin-top: 6px; font-size: 13px; }
+    .gb-test code { background: #fff; padding: 1px 4px; border: 1px solid #ddd; }
+    /* The save bar is fixed to the bottom of the window, from the menu to the right edge
+   (save-bar.js keeps its left edge on the page as the menu changes width). The
+   pages keep room for it at the end. */
+#saveBar { position: fixed; left: 200px; right: 0; bottom: 0; z-index: 1000; background: #fff;
+    border-top: 1px solid #d9e0e8; box-shadow: 0 -6px 16px rgba(30, 50, 80, .07);
+    padding: 12px 25px calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 14px;
+}
+#ws, #wiz { padding-bottom: 90px; }
+#saveMsg { margin-left: 12px; }
+
+/* who uses a grid / which série a dílo fills */
+.use-box { background: #f6f8fb; border: 1px solid #d9e2ef; border-radius: 4px; padding: 10px 14px; margin: 8px 0 14px; }
+.use-box ul { margin: 4px 0 0; padding-left: 18px; }
+.use-box.warn { background: #fff7e6; border-color: #f0d08a; }
+.use-box.ok { background: #e8f5e9; border-color: #a5d6a7; }
+.link-list { padding-left: 4px; list-style: none; margin: 6px 0; }
+.link-list li { margin: 3px 0; }
+
+/* lists of díla and grids */
+table.admin-list { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; }
+table.admin-list th, table.admin-list td { border-bottom: 1px solid #e5e5e5; padding: 7px 10px; text-align: left; vertical-align: top; }
+table.admin-list th { font-size: 12px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+table.admin-list td.file { font-family: monospace; font-size: 12px; color: #666; }
+.group-title { margin: 22px 0 6px; font-size: 15px; font-weight: 600; color: #333; }
+.st-ok { color: #2e7d32; }
+.st-warn { color: #b26a00; }
+.st-none { color: #999; }
+.page-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 14px; }
+.lead-help { color: #555; max-width: 900px; margin: 4px 0 12px; }
+
+/* a preview of the chosen grid */
+.grid-preview { max-width: 640px; margin: 4px 0 10px; }
+.grid-preview .gp-map { height: 240px; border: 1px solid #d5d9de; border-radius: 4px; background: #eef2f5; }
+.grid-preview .gp-info { margin-top: 4px; }
+
+/* state next to a link: a chip, so the two are not mistaken for each other */
+.chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 10px; margin-right: 6px; white-space: nowrap; }
+.chip.ok { background: #e6f3e6; color: #2e7d32; }
+.chip.warn { background: #fff1db; color: #a45c00; }
+table.admin-list a, .use-box a, .link-list a, .hint a { color: #1f5fa8; }
+.tech { color: #8a8f96; font-family: monospace; font-size: 12px; }
+details.uses > summary { cursor: pointer; font-weight: 600; }
+details.uses ul { margin-top: 6px; }
+.fine-list { margin: 6px 0 4px; font-size: 13px; color: #555; }
+.fine-list summary { cursor: pointer; color: #2e7d32; }
+.danger-zone { margin-top: 18px; padding-top: 10px; border-top: 1px dashed #e0c4c0; }
+.btn-outline-danger-sm { border: 1px solid #c9302c; color: #c9302c; background: #fff; border-radius: 3px; font-size: 13px; padding: 3px 10px; }

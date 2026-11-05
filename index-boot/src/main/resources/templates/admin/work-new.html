@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/vendor/leaflet/leaflet.css}"/>
+    <script type="text/javascript" th:src="@{/assets/vendor/leaflet/leaflet.js}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/grid-preview.js(v=1)}"></script>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/series-editor/editor.css(v=3)}"/>
+    <script type="text/javascript" th:src="@{/assets/series-editor/save-bar.js(v=1)}"></script>
+    <div class="container-fluid" id="wiz">
+        <a class="btn btn-link" th:href="@{/admin/works}"><i class="fas fa-arrow-left"></i> Mapová díla</a>
+        <h3>Nové mapové dílo</h3>
+        <p class="lead-help">Založí mapové dílo pro katalogizaci (objeví se v poli „Vybrat mapové dílo“) s vlastní šablonou a mřížkou
+            a — pokud chcete — i sérii na webu, která jeho listy zobrazí. Jméno v poli 490 se zadává jen jednou,
+            takže šablona a série k sobě vždy sedí. Vše se uloží jako jeden návrh změny ke schválení.</p>
+
+        <div class="ws-card">
+            <div class="ws-body" style="padding-top:12px">
+                <h4><span class="ws-num">1</span> Mřížka listů</h4>
+                <div class="help"><i class="help-i">i</i>Dílo dostane vlastní kopii vybrané mřížky (jako každé mapové dílo). Úplně novou mřížku nejdřív <a th:href="@{/admin/grids/edit}">nakreslete nebo nahrajte v Mřížkách</a>.</div>
+                <div class="form-group" style="max-width:640px">
+                    <label for="grid">Vyjít z mřížky</label>
+                    <select class="form-control" id="grid">
+                        <option value="">— vyberte —</option>
+                        <option th:each="g : ${grids}" th:value="${g.name()}" th:text="${g.label()} + '  (' + ${g.name()} + ')'"></option>
+                    </select>
+                </div>
+                <div class="grid-preview" id="gridPreview"></div>
+            </div>
+        </div>
+
+        <div class="ws-card">
+            <div class="ws-body" style="padding-top:12px">
+                <h4><span class="ws-num">2</span> Mapové dílo</h4>
+                <div class="row">
+                    <div class="col-md-4 form-group">
+                        <label for="region">Region</label>
+                        <input class="form-control" id="region" list="regions" value="Evropa"/>
+                        <datalist id="regions"><option th:each="r : ${regions}" th:value="${r}"></option></datalist>
+                    </div>
+                    <div class="col-md-8 form-group">
+                        <label for="klad">Klad listů</label>
+                        <div class="help">Filtr „Klad listů“ v katalogizačním nástroji — vyberte existující nebo napište nový.</div>
+                        <input class="form-control" id="klad" list="klady"/>
+                        <datalist id="klady"><option th:each="k : ${klady}" th:value="${k}"></option></datalist>
+                    </div>
+                </div>
+                <div class="form-group" style="max-width:640px">
+                    <label for="name">Název díla</label>
+                    <div class="help">Jak se bude zobrazovat v katalogizačním nástroji v poli „Vybrat mapové dílo“, např. <code>Karte Slowakei 1:75 000</code>.</div>
+                    <input class="form-control" id="name"/>
+                </div>
+                <details class="ws-advanced">
+                    <summary class="hint">Název souborů (technické)</summary>
+                    <div class="form-group" style="max-width:640px;margin-top:6px">
+                        <input class="form-control" id="slug"/>
+                        <div class="help">Šablona <code id="slugTpl"></code> a mřížka <code id="slugGrid"></code>. Navrhne se z regionu a názvu.</div>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <div class="ws-card">
+            <div class="ws-body" style="padding-top:12px">
+                <h4><span class="ws-num">3</span> Šablona</h4>
+                <div class="form-group" style="max-width:640px">
+                    <label for="copyFrom">Začít kopií šablony díla</label>
+                    <div class="help">Nejlépe díla, které se katalogizuje podobně (stejní vydavatelé, stejné pole). Bez výběru se použije vzorová šablona.</div>
+                    <select class="form-control" id="copyFrom">
+                        <option value="">vzorová šablona</option>
+                        <option th:each="w : ${works}" th:value="${w.layer()}" th:text="${w.name()}"></option>
+                    </select>
+                </div>
+                <div class="form-group" style="max-width:640px">
+                    <label for="name490">Jméno díla v poli 490 $a</label>
+                    <div class="help">Zapíše se do každého záznamu; podle něj web listy zařadí do série. Píše se se závorkami a středníkem, jak je v záznamech: <code>[Karte Slowakei 1:75 000] ;</code></div>
+                    <input class="form-control" id="name490"/>
+                </div>
+            </div>
+        </div>
+
+        <div class="ws-card">
+            <div class="ws-body" style="padding-top:12px">
+                <h4><span class="ws-num">4</span> Na webu</h4>
+                <label><input type="checkbox" id="createSerie" checked="checked"/> Založit i sérii na webu, která listy tohoto díla zobrazí</label>
+                <div id="serieFields">
+                    <div class="form-group" style="max-width:640px">
+                        <label for="thumb">Náhledový obrázek (URL)</label>
+                        <input class="form-control" id="thumb"/>
+                    </div>
+                    <div class="form-group">
+                        <label for="descCs">Popis — česky</label>
+                        <textarea class="form-control" id="descCs" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="descEn">Popis — anglicky</label>
+                        <textarea class="form-control" id="descEn" rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="saveBar">
+            <button type="button" id="saveBtn" class="btn btn-success btn-lg"><i class="fas fa-save"></i> Založit dílo</button>
+            <span id="saveMsg"></span>
+        </div>
+    </div>
+
+    <script th:inline="none">
+    (function () {
+        var $ = function (id) { return document.getElementById(id); };
+        function slugify(s) {
+            return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+                .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        }
+        var slugTouched = false, n490Touched = false;
+        function refresh() {
+            if (!slugTouched) { $("slug").value = slugify($("region").value + " " + $("name").value); }
+            if (!n490Touched) { $("name490").value = $("name").value.trim() ? "[" + $("name").value.trim() + "] ;" : ""; }
+            $("slugTpl").textContent = "template/" + $("slug").value + ".txt";
+            $("slugGrid").textContent = "geojson/" + $("slug").value + ".json";
+        }
+        ["region", "name"].forEach(function (id) { $(id).addEventListener("input", refresh); });
+        $("slug").addEventListener("input", function () { slugTouched = true; refresh(); });
+        $("name490").addEventListener("input", function () { n490Touched = true; });
+        $("createSerie").addEventListener("change", function () { $("serieFields").style.display = this.checked ? "" : "none"; });
+        refresh();
+        GridPreview.bind($("grid"), $("gridPreview"));
+
+        var msg = $("saveMsg");
+        function fail(m) { msg.textContent = "✕ " + m; msg.style.color = "#b23a2e"; }
+        $("saveBtn").addEventListener("click", function () {
+            var req = { region: $("region").value, klad: $("klad").value, name: $("name").value, slug: $("slug").value,
+                grid: $("grid").value, copyFrom: $("copyFrom").value, name490: $("name490").value,
+                createSerie: $("createSerie").checked, descCs: $("descCs").value, descEn: $("descEn").value,
+                thumbnailUrl: $("thumb").value };
+            if (!req.grid) { return fail("Vyberte mřížku listů (krok 1)."); }
+            if (!req.name.trim() || !req.klad.trim()) { return fail("Vyplňte klad listů a název díla (krok 2)."); }
+            msg.textContent = "Ukládám…"; msg.style.color = "";
+            fetch("/admin/works/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (!res.success) { return fail(res.message); }
+                msg.style.color = "#2e7d32";
+                if (res.prUrl) {
+                    msg.innerHTML = "✔ " + res.message.replace(/</g, "&lt;") +
+                        ' <a href="' + res.prUrl + '" target="_blank" rel="noopener">otevřít návrh změny ↗</a>';
+                } else { msg.textContent = "✔ " + res.message; }
+            })
+            .catch(function (e) { fail(e.message); });
+        });
+    })();
+    </script>
+</div>
+</body>
+</html>

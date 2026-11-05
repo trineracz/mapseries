@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/series-editor/editor.css(v=3)}"/>
+    <div class="container-fluid">
+        <h3>Mapová díla <span class="hint" th:text="'(' + ${count} + ')'"></span></h3>
+        <p class="lead-help">Mapová díla, ze kterých se vybírá v katalogizačním nástroji (pole „Vybrat mapové dílo“).
+            Každé má vlastní <strong>šablonu</strong> (co se při katalogizaci listu nabízí a doplňuje) a vlastní mřížku
+            listů. Šablona zapisuje do pole 490 jméno díla — podle něj web zařadí listy do série.</p>
+        <div class="page-actions">
+            <a class="btn btn-success" th:href="@{/admin/works/new}"><i class="fas fa-plus"></i> Nové mapové dílo</a>
+        </div>
+
+        <th:block th:each="g : ${groups}">
+            <div class="group-title" th:text="${g.key}"></div>
+            <table class="admin-list">
+                <thead><tr><th style="width:45%">Mapové dílo</th><th>Na webu</th></tr></thead>
+                <tbody>
+                <tr th:each="r : ${g.value}">
+                    <td><a th:href="@{/admin/works/edit(layer=${r.work().layer()})}" th:text="${r.work().name()}"></a>
+                        <span th:unless="${r.templateExists()}" class="chip warn">chybí šablona</span></td>
+                    <td>
+                        <th:block th:if="${r.field490() != null and r.field490().serie() != null}">
+                            <span class="chip ok">✔ zobrazuje se</span>
+                            v sérii <a th:href="@{/admin/series/edit(name=${r.field490().serie().name()})}" th:text="${r.field490().serie().prettyName()}"></a>
+                        </th:block>
+                        <span th:if="${r.field490() == null or r.field490().serie() == null}" class="chip warn"
+                              title="Podrobnosti a co s tím, najdete na stránce díla.">nezobrazuje se</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </th:block>
+    </div>
+    <script>
+    // A template addition prepared in the catalogue ("+ přidat do šablony") survives
+    // the GitHub login, which returns to a list: go on to its dílo.
+    (function () {
+        try {
+            var add = JSON.parse(localStorage.getItem("mapseries.templateAddition"));
+            if (add && add.grid && Date.now() - add.created < 24 * 3600 * 1000) {
+                location.href = "/admin/works/edit?layer=" + encodeURIComponent(add.grid);
+            }
+        } catch (e) { /* nothing pending */ }
+    })();
+    </script>
+</div>
+</body>
+</html>
