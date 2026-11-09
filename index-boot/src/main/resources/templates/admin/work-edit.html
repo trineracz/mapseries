@@ -2,10 +2,10 @@
 <html th:replace="~{admin/layout :: page(~{::content})}" xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="content">
-    <link rel="stylesheet" type="text/css" th:href="@{/assets/series-editor/editor.css(v=3)}"/>
+    <link rel="stylesheet" type="text/css" th:href="@{/assets/series-editor/editor.css(v=4)}"/>
     <script type="text/javascript" th:src="@{/assets/series-editor/save-bar.js(v=1)}"></script>
     <script type="text/javascript" th:src="@{/assets/series-editor/template-editor.js(v=4)}"></script>
-    <script type="text/javascript" th:src="@{/assets/series-editor/template-form.js(v=4)}"></script>
+    <script type="text/javascript" th:src="@{/assets/series-editor/template-form.js(v=5)}"></script>
 
     <div class="container-fluid">
         <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>

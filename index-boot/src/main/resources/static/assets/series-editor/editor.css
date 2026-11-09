@@ -132,6 +132,27 @@
     .tf-item input { border: none; font-family: monospace; font-size: 12px; width: 140px; outline: none; }
     .tf-item { cursor: text; background: #fff; }
     .tf-item:focus-within { border-color: #3388ff; }
+    /* Pole šablony: every MARC field of the template */
+    table.tf-lines th.w-tag { width: 150px; }
+    table.tf-lines th.w-ind { width: 70px; }
+    table.tf-lines td.tf-tag b { font-family: monospace; font-size: 13px; }
+    table.tf-lines td.tf-tag .tf-where { display: block; margin-left: 0; color: #666; font-family: inherit; }
+    table.tf-lines td.tf-inds { white-space: nowrap; }
+    table.tf-lines td.tf-inds input { display: inline-block; width: 26px; text-align: center; font-family: monospace; margin-right: 3px; }
+    table.tf-lines td textarea.tf-content { font-family: monospace; }
+    table.tf-lines td.tf-summary { font-family: monospace; color: #777; white-space: pre-wrap; overflow-wrap: anywhere; }
+    table.tf-lines .tf-subject { margin-top: 2px; border: 1px solid #ccc; background: #fff; border-radius: 3px; font-size: 12px; }
+    .tf-keep { color: #999; cursor: help; }
+    .tf-add-fields { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+    .tf-add-form { flex-basis: 100%; }
+    .tf-add-form summary { cursor: pointer; color: #1f5fa8; font-size: 13px; }
+    .tf-add-body { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin: 6px 0; font-size: 12px; }
+    .tf-add-body label { display: flex; flex-direction: column; gap: 2px; font-weight: normal; }
+    .tf-add-body input { font-family: monospace; padding: 2px 4px; }
+    .tf-add-body input[maxlength="1"] { width: 28px; text-align: center; display: inline-block; }
+    .tf-add-body input[maxlength="3"] { width: 50px; }
+    .tf-add-body .tf-grow { flex: 1 1 220px; }
+    .tf-add-body .tf-grow input, .tf-add-body textarea { width: 100%; box-sizing: border-box; }
     .tf-list-long .tf-items { display: block; }
     .tf-list-long .tf-item { display: flex; margin-bottom: 6px; }
     .tf-list-long .tf-item input { flex: 1; width: auto; }

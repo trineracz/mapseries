@@ -46,12 +46,17 @@ window.TemplateForm = (function () {
 
     // Where each block sits: its MARC field (a line start outside any block),
     // tag, subfield ($$x before it) and offset in the field (3 = first indicator).
-    function describe(text, blocks) {
+    function lineStarts(text, blocks) {
         var starts = [];
         for (var p = 0; p < text.length; p = text.indexOf("\n", p) + 1 || text.length) {
             var inside = blocks.some(function (b) { return p > b.start && p < b.end; });
             if (!inside) { starts.push(p); }
         }
+        return starts;
+    }
+
+    function describe(text, blocks) {
+        var starts = lineStarts(text, blocks);
         blocks.forEach(function (b) {
             var fs = -1;
             for (var i = 0; i < starts.length && starts[i] <= b.start; i++) { fs = starts[i]; }
@@ -91,7 +96,93 @@ window.TemplateForm = (function () {
                 lists.push(b);
             }
         });
-        return { blocks: blocks, tables: tables, lists: lists };
+        return { blocks: blocks, tables: tables, lists: lists, lines: fieldLines(text, blocks) };
+    }
+
+    // ---------- whole fields: the lines of the template ----------
+
+    var FIELD_NAMES = {
+        LDR: "Návěští", FMT: "Formát záznamu", "007": "Fyzický popis (kódy)", "008": "Údaje pevné délky",
+        "034": "Kódované matematické údaje", "040": "Zdroj katalogizace", "041": "Kód jazyka",
+        "043": "Kód geografické oblasti", "072": "Konspekt", "080": "MDT", "110": "Korporace",
+        "245": "Název", "246": "Variantní název", "250": "Vydání", "255": "Měřítko a souřadnice",
+        "260": "Nakladatelské údaje", "264": "Nakladatelské údaje", "300": "Fyzický popis",
+        "336": "Typ obsahu", "337": "Typ média", "338": "Typ nosiče", "490": "Edice (název série)",
+        "500": "Poznámka", "650": "Předmětové heslo – téma", "651": "Předmětové heslo – zeměpisné jméno",
+        "655": "Forma, žánr", "700": "Další osoba", "710": "Další korporace", "830": "Edice – vedlejší záhlaví"
+    };
+    // fields every record needs: not offered for removal
+    var REQUIRED = ["LDR", "FMT", "008", "245"];
+    // subject lines picked from the authority file, by the type of /api/authorities
+    var SUBJECTS = { "650": "topic", "651": "geographic", "655": "form" };
+
+    function sortKey(tag) {
+        if (tag === "LDR") { return -2; }
+        if (tag === "FMT") { return -1; }
+        return /^\d{3}$/.test(tag) ? +tag : 1000;
+    }
+
+    // Every MARC field of the template: "TAG" + 2 indicators + " L " + content.
+    // fixed = a line without drop-downs, the same in every record.
+    function fieldLines(text, blocks) {
+        var starts = lineStarts(text, blocks), out = [];
+        starts.forEach(function (s, i) {
+            var e = i + 1 < starts.length ? starts[i + 1] : text.length;
+            var body = text.slice(s, e).replace(/\r?\n$/, "");
+            var own = blocks.filter(function (b) { return b.start >= s && b.start < e; });
+            var m = /^([0-9A-Z]{3})(.)(.) L ([\s\S]*)$/.exec(body);
+            if (own.length && /^[0-9A-Z]{3}/.test(body)) {
+                out.push({ start: s, end: e, bodyEnd: s + body.length, tag: body.substr(0, 3), blocks: own, fixed: false });
+            } else if (m && !own.length) {
+                out.push({ start: s, end: e, bodyEnd: s + body.length, tag: m[1], ind1: m[2], ind2: m[3],
+                           content: m[4], blocks: own, fixed: true });
+            }
+        });
+        return out;
+    }
+
+    // what a line shows in the overview: drop-downs as ⟨their title⟩
+    function lineSummary(line, text) {
+        var s = text.slice(line.start, line.end).replace(/\r?\n$/, ""), out = "", at = 0;
+        line.blocks.forEach(function (b) {
+            var o = b.obj, label = o.title || o.id || (o.value && o.value.attr ? "z listu" : "hodnota");
+            out += s.slice(at, b.start - line.start) + "⟨" + label + "⟩";
+            at = b.end - line.start;
+        });
+        return (out + s.slice(at)).slice(3);
+    }
+
+    // why a field cannot be removed, or "" when it can
+    function keepReason(line, blocks) {
+        if (REQUIRED.indexOf(line.tag) >= 0) { return "Pole potřebuje každý záznam."; }
+        if (line.tag === "490") { return "Podle pole 490 web zařadí listy do série."; }
+        var used = line.blocks.filter(function (b) {
+            return b.obj.id && blocks.some(function (d) { return d.obj.base === b.obj.id && line.blocks.indexOf(d) < 0; });
+        });
+        return used.length ? "Podle tohoto pole se vyplňují jiná pole (" + (used[0].obj.title || used[0].obj.id) + ")." : "";
+    }
+
+    // Links between fields that point nowhere or carry values nobody can choose.
+    function checkLinks(model) {
+        var ids = {}, out = [];
+        model.blocks.forEach(function (b) { if (b.obj.id) { ids[b.obj.id] = b; } });
+        model.blocks.forEach(function (b) {
+            if (b.obj.base && !ids[b.obj.base]) {
+                out.push(where(b) + " „" + (b.obj.title || "") + "“ se řídí polem „" + b.obj.base +
+                    "“, které v šabloně není – katalog ho nevyplní.");
+            }
+        });
+        model.tables.forEach(function (t) {
+            var n = t.base.obj.values.length;
+            t.cols.forEach(function (c) {
+                var extra = c.block.obj.valuesByBaseIndex.length - n;
+                if (extra > 0) {
+                    out.push(c.where + " „" + c.label + "“ má o " + extra + " " + (extra === 1 ? "hodnotu" : extra < 5 ? "hodnoty" : "hodnot") +
+                        " víc, než je řádků v „" + (t.base.obj.title || t.base.obj.id) + "“ – katalog je nikdy nenabídne.");
+                }
+            });
+        });
+        return out;
     }
 
     // a block that is a whole line of the record ("7101  L $$a…" inside the JSON)
@@ -231,14 +322,18 @@ window.TemplateForm = (function () {
 
     // ---------- the authority file picker ----------
 
-    var picker = null, pickerCallback = null;
+    var picker = null, pickerCallback = null, pickerType = "corporation";
+    var NOT_FOUND = { corporation: "Korporace není v Národních autoritách – zapsat ručně",
+        topic: "Heslo není v Národních autoritách – zapsat ručně",
+        geographic: "Zeměpisné jméno není v Národních autoritách – zapsat ručně",
+        form: "Forma není v Národních autoritách – zapsat ručně" };
     function closePicker() { picker.style.display = "none"; pickerCallback = null; }
     function pickerDone(rec) {
         var callback = pickerCallback;
         closePicker();
         if (callback) { callback(rec); }
     }
-    function pickAuthority(title, current, onPick) {
+    function pickAuthority(title, current, onPick, type) {
         if (!picker) {
             picker = document.createElement("div");
             picker.className = "tf-modal";
@@ -247,11 +342,11 @@ window.TemplateForm = (function () {
                 '<h4 class="tf-title"></h4>' +
                 '<input type="text" class="form-control tf-q" placeholder="Napište část názvu (stačí bez diakritiky)…"/>' +
                 '<div class="tf-results"></div>' +
-                '<details class="tf-manual"><summary>Korporace není v Národních autoritách – zapsat ručně</summary>' +
+                '<details class="tf-manual"><summary></summary>' +
                 '<div class="tf-manual-body">' +
                 '<label>Název (jak se píše do pole, podpole odděleně $$b)<input type="text" class="form-control tf-m-name"/></label>' +
                 '<label>Kód autority $7 (nechte prázdné, pokud žádný není)<input type="text" class="form-control tf-m-code"/></label>' +
-                '<label>Indikátor <select class="tf-m-ind"><option value="2">2 – jméno korporace</option>' +
+                '<label class="tf-m-ind-label">Indikátor <select class="tf-m-ind"><option value="2">2 – jméno korporace</option>' +
                 '<option value="1">1 – jurisdikce (stát, země…)</option><option value="0">0 – invertované jméno</option></select></label>' +
                 '<button type="button" class="btn btn-sm btn-default tf-m-use">Použít</button></div></details>' +
                 '<div class="tf-buttons"><button type="button" class="btn btn-sm btn-default tf-cancel">Zavřít</button></div>' +
@@ -267,7 +362,7 @@ window.TemplateForm = (function () {
                 var my = ++seq, query = q.value.trim();
                 if (query.length < 2) { results.innerHTML = ""; return; }
                 timer = setTimeout(function () {
-                    fetch("/api/authorities?type=corporation&limit=15&q=" + encodeURIComponent(query))
+                    fetch("/api/authorities?type=" + pickerType + "&limit=15&q=" + encodeURIComponent(query))
                         .then(function (r) { return r.ok ? r.json() : []; })
                         .then(function (list) {
                             if (my !== seq) { return; }
@@ -296,6 +391,9 @@ window.TemplateForm = (function () {
             });
         }
         pickerCallback = onPick;
+        pickerType = type || "corporation";
+        picker.querySelector(".tf-manual summary").textContent = NOT_FOUND[pickerType];
+        picker.querySelector(".tf-m-ind-label").style.display = pickerType === "corporation" ? "" : "none";
         picker.querySelector(".tf-title").textContent = title;
         var q = picker.querySelector(".tf-q");
         q.value = (current || "").split("$$")[0].replace(/\.$/, "");
@@ -494,14 +592,163 @@ window.TemplateForm = (function () {
             return h + '<button type="button" class="btn btn-sm btn-default tf-add">+ Přidat</button></div></div>';
         }
 
+        function fieldsHtml() {
+            var text = opts.getText(), links = checkLinks(model);
+            var h = '<h4 class="tf-section">Pole šablony</h4><p class="hint">Všechna pole záznamu v pořadí, v jakém je katalog ' +
+                "zapíše. Pevná pole (u každého listu stejná) upravíte tady; pole s nabídkou nebo s údaji z listu " +
+                "upravíte v tabulkách výše nebo v textu šablony.</p>";
+            if (links.length) {
+                h += '<div class="tf-problems"><details open><summary>⚠ Vazby mezi poli: ' + links.length + "</summary><ul>" +
+                    links.map(function (l) { return "<li>" + esc(l) + "</li>"; }).join("") + "</ul></details></div>";
+            }
+            h += '<div class="tf-card tf-fields"><div class="tf-scroll"><table class="tf-table tf-lines" lang="cs"><thead><tr>' +
+                '<th class="w-tag">Pole</th><th class="w-ind">Indikátory</th><th>Obsah</th><th class="w-act"></th></tr></thead><tbody>';
+            model.lines.forEach(function (l, i) {
+                var reason = keepReason(l, model.blocks);
+                h += '<tr data-line="' + i + '"><td class="tf-tag"><b>' + esc(l.tag) + '</b><span class="tf-where">' +
+                    esc(FIELD_NAMES[l.tag] || "") + "</span></td>";
+                if (l.fixed) {
+                    h += '<td class="tf-inds"><input type="text" class="tf-ind1" maxlength="1" title="1. indikátor" value="' + esc(l.ind1) + '"/>' +
+                        '<input type="text" class="tf-ind2" maxlength="1" title="2. indikátor" value="' + esc(l.ind2) + '"/></td>' +
+                        '<td><textarea rows="1" class="tf-content">' + esc(l.content) + "</textarea>" +
+                        (SUBJECTS[l.tag] ? '<button type="button" class="tf-subject" title="Vybrat z Národních autorit">Změnit…</button>' : "") + "</td>";
+                } else {
+                    h += '<td colspan="2" class="tf-summary" title="Pole s nabídkou nebo s údaji z listu – upravuje se výše nebo v textu">' +
+                        esc(lineSummary(l, text)) + "</td>";
+                }
+                h += '<td class="tf-row-actions">' + (reason
+                    ? '<span class="tf-keep" title="' + esc(reason) + '">🔒</span>'
+                    : '<button type="button" class="tf-line-del" title="Odebrat pole">✕</button>') + "</td></tr>";
+            });
+            h += "</tbody></table></div>";
+            h += '<div class="tf-add-fields">' +
+                '<button type="button" class="btn btn-sm btn-default tf-add-subject" data-tag="650">+ Předmětové heslo (650)</button>' +
+                '<button type="button" class="btn btn-sm btn-default tf-add-subject" data-tag="651">+ Zeměpisné jméno (651)</button>' +
+                '<button type="button" class="btn btn-sm btn-default tf-add-subject" data-tag="655">+ Forma, žánr (655)</button>' +
+                '<details class="tf-add-form"><summary>+ Jiné pevné pole</summary><div class="tf-add-body">' +
+                '<label>Pole <input type="text" class="tf-n-tag" maxlength="3" placeholder="500"/></label>' +
+                '<label>Indikátory <input type="text" class="tf-n-ind1" maxlength="1"/><input type="text" class="tf-n-ind2" maxlength="1"/></label>' +
+                '<label class="tf-grow">Obsah <input type="text" class="tf-n-content" placeholder="$$aText poznámky"/></label>' +
+                '<button type="button" class="btn btn-sm btn-default tf-add-fixed">Přidat</button></div></details>' +
+                '<details class="tf-add-form"><summary>+ Pole s nabídkou</summary><div class="tf-add-body">' +
+                '<label>Pole <input type="text" class="tf-d-tag" maxlength="3" placeholder="500"/></label>' +
+                '<label>Indikátory <input type="text" class="tf-d-ind1" maxlength="1"/><input type="text" class="tf-d-ind2" maxlength="1"/></label>' +
+                '<label>Podpole <input type="text" class="tf-d-sub" maxlength="1" value="a"/></label>' +
+                '<label class="tf-grow">Název nabídky <input type="text" class="tf-d-title" placeholder="Poznámka k vydání"/></label>' +
+                '<label class="tf-grow">Hodnoty (každá na řádek)<textarea class="tf-d-values" rows="3"></textarea></label>' +
+                '<button type="button" class="btn btn-sm btn-default tf-add-drop">Přidat</button></div></details>' +
+                "</div></div>";
+            return h;
+        }
+
+        function newline() { return /\r\n/.test(opts.getText()) ? "\r\n" : "\n"; }
+
+        function replaceText(next) {
+            updating = true;
+            try { opts.setText(next); } finally { updating = false; }
+            model = build(opts.getText());
+            render();
+        }
+
+        function lineText(tag, ind1, ind2, content) {
+            return tag + (ind1 || " ") + (ind2 || " ") + " L " + content;
+        }
+
+        // a new field goes after the last field with the same or a lower tag
+        function insertLine(tag, line) {
+            var text = opts.getText(), n = newline(), k = sortKey(tag);
+            var before = model.lines.filter(function (l) { return sortKey(l.tag) <= k; }).pop();
+            var at = before ? before.end : (model.lines.length ? model.lines[0].start : text.length);
+            var next = at === text.length && text && !/\n$/.test(text)
+                ? text + n + line
+                : text.slice(0, at) + line + n + text.slice(at);
+            replaceText(next);
+            var added = -1;
+            model.lines.forEach(function (l, i) { if (added < 0 && l.start === (at === text.length && text && !/\n$/.test(text) ? at + n.length : at)) { added = i; } });
+            var tr = root.querySelector('tr[data-line="' + added + '"]');
+            flash(tr, true);
+        }
+
+        function subjectSuffix(tag) {
+            var same = model.lines.filter(function (l) { return l.fixed && l.tag === tag && /\$\$7/.test(l.content); })[0];
+            if (same) { return (same.content.match(/\$\$7[^$]*([\s\S]*)$/) || ["", ""])[1]; }
+            return tag === "655" ? "" : "$$2czenas";
+        }
+
+        function subjectContent(tag, rec) {
+            return "$$a" + rec.marc + (rec.code ? "$$7" + rec.code : "") + subjectSuffix(tag);
+        }
+
+        function slugId(title) {
+            var base = (title || "nabidka").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "nabidka";
+            var id = base, i = 2;
+            while (model.blocks.some(function (b) { return b.obj.id === id; })) { id = base + "_" + i++; }
+            return id;
+        }
+
+        root.addEventListener("change", function (e) {
+            var tr = e.target.closest("tr[data-line]");
+            if (!tr || !root.querySelector(".tf-fields").contains(tr)) { return; }
+            e.stopImmediatePropagation();
+            var l = model.lines[+tr.getAttribute("data-line")], text = opts.getText();
+            var line = lineText(l.tag, tr.querySelector(".tf-ind1").value, tr.querySelector(".tf-ind2").value,
+                tr.querySelector(".tf-content").value.replace(/\r?\n/g, " "));
+            replaceText(text.slice(0, l.start) + line + text.slice(l.bodyEnd));
+        }, true);
+
+        root.addEventListener("click", function (e) {
+            var btn = e.target.closest("button");
+            if (!btn || !btn.closest(".tf-fields")) { return; }
+            e.stopImmediatePropagation();
+            var text = opts.getText(), tr = btn.closest("tr[data-line]"), l = tr ? model.lines[+tr.getAttribute("data-line")] : null;
+            if (btn.classList.contains("tf-line-del")) {
+                if (!confirm("Odebrat pole " + l.tag + (FIELD_NAMES[l.tag] ? " (" + FIELD_NAMES[l.tag] + ")" : "") + " ze šablony?")) { return; }
+                tr.classList.add("tf-leaving");
+                setTimeout(function () {
+                    var from = l.start, to = l.end;
+                    if (to === text.length && from > 0 && !/\n$/.test(text.slice(from, to))) {
+                        from = text.lastIndexOf("\n", from - 1);
+                        if (from > 0 && text.charAt(from - 1) === "\r") { from--; }
+                    }
+                    replaceText(text.slice(0, from) + text.slice(to));
+                }, 300);
+            } else if (btn.classList.contains("tf-subject")) {
+                pickAuthority(FIELD_NAMES[l.tag] + " (" + l.tag + ")", (l.content.match(/\$\$a([^$]*)/) || ["", ""])[1], function (rec) {
+                    replaceText(text.slice(0, l.start) + lineText(l.tag, l.ind1, l.ind2, subjectContent(l.tag, rec)) + text.slice(l.bodyEnd));
+                }, SUBJECTS[l.tag]);
+            } else if (btn.classList.contains("tf-add-subject")) {
+                var tag = btn.getAttribute("data-tag");
+                pickAuthority("Přidat: " + FIELD_NAMES[tag] + " (" + tag + ")", "", function (rec) {
+                    var exists = model.lines.some(function (x) { return x.tag === tag && rec.code && x.content.indexOf("$$7" + rec.code) >= 0; });
+                    if (exists) { alert("Toto heslo už v šabloně je."); return; }
+                    insertLine(tag, lineText(tag, " ", "7", subjectContent(tag, rec)));
+                }, SUBJECTS[tag]);
+            } else if (btn.classList.contains("tf-add-fixed")) {
+                var box = btn.closest(".tf-add-body"), t = box.querySelector(".tf-n-tag").value.trim().toUpperCase();
+                var content = box.querySelector(".tf-n-content").value.trim();
+                if (!/^[0-9A-Z]{3}$/.test(t)) { alert("Pole je trojice znaků, např. 500."); return; }
+                if (!content) { alert("Doplňte obsah pole, např. $$aText poznámky."); return; }
+                insertLine(t, lineText(t, box.querySelector(".tf-n-ind1").value, box.querySelector(".tf-n-ind2").value, content));
+            } else if (btn.classList.contains("tf-add-drop")) {
+                var d = btn.closest(".tf-add-body"), dt = d.querySelector(".tf-d-tag").value.trim().toUpperCase();
+                var sub = d.querySelector(".tf-d-sub").value.trim() || "a", title = d.querySelector(".tf-d-title").value.trim();
+                var values = d.querySelector(".tf-d-values").value.split(/\r?\n/).map(function (v) { return v.trim(); }).filter(Boolean);
+                if (!/^\d{3}$/.test(dt)) { alert("Pole je trojice číslic, např. 500."); return; }
+                if (!title || !values.length) { alert("Doplňte název nabídky a aspoň jednu hodnotu."); return; }
+                var block = JSON.stringify({ id: slugId(title), title: title, values: values });
+                insertLine(dt, lineText(dt, d.querySelector(".tf-d-ind1").value, d.querySelector(".tf-d-ind2").value, "$$" + sub + block));
+            }
+        }, true);
+
         function render() {
-            if (!model.tables.length && !model.lists.length) {
-                root.innerHTML = '<p class="hint">Šablona nemá žádné nabídky k úpravě. Strukturu šablony upravíte v textu (pokročilé).</p>';
+            if (!model.tables.length && !model.lists.length && !model.lines.length) {
+                root.innerHTML = '<p class="hint">Šablona je prázdná. Pole přidáte v textu šablony (pokročilé).</p>';
                 return;
             }
             var h = '<p class="help"><i class="help-i">i</i>Tady upravíte, z čeho katalogizátor vybírá. ' +
                 "Změny se hned propíšou do textu šablony; uloží se tlačítkem Uložit dole na stránce. " +
-                "Přidat nebo odebrat celé pole MARC jde zatím jen v textu (pokročilé).</p>";
+                "Celá pole záznamu přidáte nebo odeberete v části Pole šablony dole.</p>";
             model.tables.forEach(function (t, ti) { h += tableHtml(t, ti); });
             if (model.lists.length) {
                 h += '<h4 class="tf-section">Další nabídky</h4><p class="hint">Hodnoty, které katalog nabídne ' +
@@ -510,6 +757,7 @@ window.TemplateForm = (function () {
                     "umí zapsat až tři jazyky mapy.</p>";
                 model.lists.forEach(function (b, li) { h += listHtml(b, li); });
             }
+            h += fieldsHtml();
             root.innerHTML = h;
             root.querySelectorAll("textarea").forEach(grow);
             mark();
@@ -602,6 +850,7 @@ window.TemplateForm = (function () {
         root.addEventListener("change", function (e) {
             var input = e.target;
             if (input.tagName !== "INPUT" && input.tagName !== "TEXTAREA") { return; }
+            if (input.closest(".tf-fields")) { return; }
             var card = input.closest(".tf-card"), changed = {};
             if (card.hasAttribute("data-t")) {
                 var t = model.tables[+card.getAttribute("data-t")];
