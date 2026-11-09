@@ -110,6 +110,20 @@ class WorksControllerTest {
         assertNull(DataRepoService.field490("245 0 L $$aX", series));
     }
 
+    @Test
+    void renamesOnlyTheTitleOfThatDilo() {
+        List<Work> before = DataRepoService.parseWorks(CONFIG);
+        Work first = before.get(0);
+        String out = WorksController.withTitle(CONFIG, first.layer(), "Svět; Nový klad; Nové \"jméno\"");
+        assertNotNull(out);
+        List<Work> after = DataRepoService.parseWorks(out);
+        assertEquals("Nové \"jméno\"", after.get(0).name());
+        assertEquals("Nový klad", after.get(0).klad());
+        assertEquals(first.layer(), after.get(0).layer());
+        assertEquals(before.subList(1, before.size()), after.subList(1, after.size()));
+        assertNull(WorksController.withTitle(CONFIG, "no-such-layer", "a; b; c"));
+    }
+
     /** The real config.js, when a checkout of the data repo is given (MAPSERIES_DATA=…/mapseries-data). */
     @Test
     void addsADiloToTheRealConfig() throws Exception {
@@ -124,5 +138,22 @@ class WorksControllerTest {
         assertEquals(before.size() + 1, after.size());
         assertEquals(before, after.subList(0, before.size()));
         assertEquals("evropa-test", after.get(after.size() - 1).layer());
+
+        // renaming every dílo in turn touches only its own title
+        for (Work w : before) {
+            String renamed = WorksController.withTitle(config, w.layer(), w.region() + "; " + w.klad() + "; X");
+            assertNotNull(renamed, w.layer());
+            List<Work> r = DataRepoService.parseWorks(renamed);
+            for (int i = 0; i < before.size(); i++) {
+                assertEquals(before.get(i).layer().equals(w.layer()) ? "X" : before.get(i).name(), r.get(i).name());
+            }
+            // the only difference is inside one line: that dílo's title
+            int p = 0, e = 0;
+            while (config.charAt(p) == renamed.charAt(p)) p++;
+            while (config.charAt(config.length() - 1 - e) == renamed.charAt(renamed.length() - 1 - e)) e++;
+            String changed = config.substring(p, config.length() - e);
+            assertEquals(-1, changed.indexOf('\n'), w.layer());
+            assertTrue(config.lastIndexOf("title:", p) > config.lastIndexOf('}', p), w.layer());
+        }
     }
 }

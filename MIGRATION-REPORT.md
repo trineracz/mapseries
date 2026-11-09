@@ -57,13 +57,33 @@ Migrace je **funkčně kompletní** — katalog, editor i administrace běží n
 **Nic funkčně.** Katalog, editor sérií i administrace fungují stejně:
 
 - **Katalog** (veřejný) — vyhledávání, zobrazení sérií na mapě, detail listů, náhledy z Krameria, přepínání jazyka CZ/EN.
-- **Editor** (`/edit`) — zakládání a úpravy sérií, zápis změn na GitHub.
+- **Editor** (`/edit`) — zakládání a úpravy sérií, zápis změn na GitHub. (Ponechán do schválení nové administrace, viz 4a.)
 - **Administrace** (`/admin`) — přihlášení přes GitHub OAuth, správa obsahu, editor textů, správci, harvest (spuštění + rollback verzí), detekce nenavázaných map.
 
 Opravené drobnosti během migrace (technické, uživatel je nepozná jako „novou funkci"):
 - Náhledy z Krameria — přepnuty na aktuální API `api.kramerius.mzk.cz` (v7 IIIF); starý endpoint byl vyřazen z provozu.
 - Ikona vlajky přepínače jazyků — opraveno poškození CSS při přenosu.
 - `/admin/` (s lomítkem) — doplněno chybějící přesměrování.
+
+---
+
+## 4a. Druhá etapa: zjednodušení katalogizace a správy šablon
+
+Na modernizovaném základu navazují úpravy, které katalogizaci zrychlují a omezují chyby. Šablona a Národní autority ČR jsou zdrojem pravdy; údaje určující identitu (korporace a její kód $7, indikátory, kódy v 008) se vybírají, přepisové údaje (245 $c, 260/264) zůstávají upravitelné.
+
+**Katalogizační nástroj (`/catalog`)**
+- Hledání korporací v Národních autoritách ČR v polích 110 a 710 (název, kód $7 a indikátor se vloží najednou). Autority se jednou týdně stahují z úplného exportu NK ČR.
+- Kontrola záznamu při kopírování: seznam chyb (délka 008, chybějící korporace, kód autority, nakladatelské údaje, rozměry), označená pole a odkaz do editoru šablony daného díla.
+- Hodnotu, která v šabloně chybí, lze jedním odkazem připravit k doplnění do šablony.
+- Prázdná pole 7XX se do záznamu nekopírují.
+
+**Administrace (`/admin`)** — uspořádaná podle toho, jak spolu data souvisejí:
+- *Katalogizace → Mapová díla*: seznam děl, název a zařazení díla, šablona ve formulářovém editoru (tabulka korporací a navázaných polí, nabídky, všechna pole záznamu včetně předmětových hesel z NK, kontrola vazeb) i v textu; průvodce založením nového díla.
+- *Veřejný web → Série, Aktualizace, Nepřiřazené mapy* (u nepřiřazených záznamů důvod a odkazy na VuFind a sken).
+- *Společné → Mřížky* (editor mřížky listů, import a export GeoJSON/KML/CSV/WKT) a *Správa uživatelů*.
+- Každé uložení vytvoří návrh změny (pull request) ke schválení; mění jen skutečně upravené řádky a bez změny návrh nevzniká.
+
+**Opravy dat šablon** (ověřené proti Národním autoritám a záznamům v Alephu) se připravují jako samostatné návrhy změn ke schválení.
 
 ---
 
@@ -91,6 +111,9 @@ Aplikace je funkčně kompletní a připravená k nasazení. Nasazení do produk
 - **Konfigurace zdroje dat** — plně řízená proměnnými prostředí (`.env`), nic není napevno v kódu:
   - `MAPSERIES_REPO_USER` / `MAPSERIES_REPO_NAME` — odkud se **čte**
   - `MAPSERIES_REPO_WRITE_USER` / `MAPSERIES_REPO_WRITE_NAME` — kam se **zapisuje**
+  - `MAPSERIES_REPO_PR_USER` / `MAPSERIES_REPO_PR_NAME` — kde vznikají **návrhy změn** (nevyplněno = repozitář pro čtení, tj. produkční chování)
+  - `MAPSERIES_AUTHORITY_CRON` — pravidelná aktualizace Národních autorit (např. `0 0 3 * * SUN`)
+- **Testovací nasazení** — běží na vývojovém serveru (`mapseries.trinera.dev`) nad samostatnou kopií dat; čte i zapisuje jen tuto kopii, do produkčních dat nezapisuje.
 - **Schválení GitHub OAuth aplikace** v produkční organizaci (`moravianlibrary`) — standardní jednorázový krok, po kterém prochází i zápis změn (commit).
 - **Runtime** — jeden `jar` ve vestavěném Tomcatu (image `eclipse-temurin:17-jre`), spouštěný přes `docker compose`. Žádný externí aplikační server.
 - **Upgrade databáze** — vhodné při nasazení povýšit PostgreSQL z EOL verze 10 na aktuálně podporovanou; aplikace je na verzi DB nezávislá a datový model se nemění.

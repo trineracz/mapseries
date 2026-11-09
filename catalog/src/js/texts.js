@@ -139,6 +139,14 @@ export default {
     "cs": "Chybí název listu (245 $a)",
     "en": "Sheet title missing (245 $a)"
   },
+  "template-edit": {
+    "cs": "Upravit šablonu díla ↗",
+    "en": "Edit the template ↗"
+  },
+  "template-edit-hint": {
+    "cs": "Otevře editor šablony tohoto mapového díla (po přihlášení) v nové záložce.",
+    "en": "Opens the template editor of this map work (after a login) in a new tab."
+  },
   "template-add": {
     "cs": "+ přidat do šablony",
     "en": "+ add to the template"

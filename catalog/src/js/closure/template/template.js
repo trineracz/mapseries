@@ -258,8 +258,12 @@ ms.Template.prototype.showCheck_ = function (problems) {
         }
       });
     });
+    // the template is fixed in the admin, in the editor of this dílo (D3h)
+    var edit = goog.dom.createDom('a', { 'class': 'template-edit', 'target': '_blank', 'rel': 'noopener',
+      'href': '/admin/works/edit?layer=' + encodeURIComponent(this.series_.layer),
+      'title': languages.getText('template-edit-hint') }, languages.getText('template-edit'));
     box = goog.dom.createDom('div', 'copy-check copy-check-problems',
-      goog.dom.createDom('div', null, languages.getText('check-problems')), list);
+      goog.dom.createDom('div', null, languages.getText('check-problems') + ' ', edit), list);
   }
   // under the copy buttons; the template above gets shorter to keep it in view
   container.appendChild(box);

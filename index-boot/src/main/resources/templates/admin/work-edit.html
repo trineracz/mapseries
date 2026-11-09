@@ -13,6 +13,29 @@
             <a class="btn btn-link" th:href="@{/admin/works}"><i class="fas fa-arrow-left"></i> Mapová díla</a>
             <h3 th:text="${work.name()}"></h3>
             <p class="hint" th:text="${work.region()} + ' · klad listů: ' + ${work.klad()}"></p>
+            <details class="work-meta" style="margin:-4px 0 12px">
+                <summary>Upravit název a zařazení díla</summary>
+                <div class="row" style="max-width:980px;margin-top:8px">
+                    <div class="col-md-3 form-group">
+                        <label for="metaRegion">Region</label>
+                        <input class="form-control" id="metaRegion" list="metaRegions" th:value="${work.region()}"/>
+                        <datalist id="metaRegions"><option th:each="r : ${regions}" th:value="${r}"></option></datalist>
+                    </div>
+                    <div class="col-md-4 form-group">
+                        <label for="metaKlad">Klad listů</label>
+                        <input class="form-control" id="metaKlad" list="metaKlady" th:value="${work.klad()}"/>
+                        <datalist id="metaKlady"><option th:each="k : ${klady}" th:value="${k}"></option></datalist>
+                    </div>
+                    <div class="col-md-5 form-group">
+                        <label for="metaName">Název díla</label>
+                        <input class="form-control" id="metaName" th:value="${work.name()}"/>
+                    </div>
+                </div>
+                <div class="help"><i class="help-i">i</i>Takhle se dílo zobrazuje v katalogizačním nástroji (filtry Region a Klad listů,
+                    výběr díla). Pole 490 ani název série na webu se tím nemění.</div>
+                <button type="button" class="btn btn-default btn-sm" id="metaSave">Uložit název a zařazení</button>
+                <span id="metaMsg"></span>
+            </details>
 
             <!-- where the sheets end up on the web -->
             <div class="use-box" th:classappend="${field490 != null and field490.serie() != null} ? 'ok' : 'warn'">
@@ -116,6 +139,25 @@
             var form = document.getElementById("tplForm");
             form.insertBefore(banner, form.firstChild);
         }
+
+        var metaMsg = document.getElementById("metaMsg");
+        document.getElementById("metaSave").addEventListener("click", function () {
+            metaMsg.textContent = "Ukládám…"; metaMsg.style.color = "";
+            fetch("/admin/works/rename", { method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ layer: layer, region: document.getElementById("metaRegion").value,
+                    klad: document.getElementById("metaKlad").value, name: document.getElementById("metaName").value }) })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                metaMsg.style.color = res.success ? "#2e7d32" : "#b23a2e";
+                metaMsg.textContent = (res.success ? "✔ " : "✕ ") + res.message;
+                if (res.prUrl) {
+                    var a = document.createElement("a");
+                    a.href = res.prUrl; a.target = "_blank"; a.rel = "noopener"; a.textContent = " otevřít návrh změny ↗";
+                    metaMsg.appendChild(a);
+                }
+            })
+            .catch(function (e) { metaMsg.style.color = "#b23a2e"; metaMsg.textContent = "✕ " + e.message; });
+        });
 
         var msg = document.getElementById("saveMsg");
         function fail(m) { msg.textContent = "✕ " + m; msg.style.color = "#b23a2e"; }

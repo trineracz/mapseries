@@ -93,6 +93,9 @@ public class WorksController {
         String template = data.exists(work.templatePath()) ? data.read(work.templatePath()) : null;
         Field490 f490 = data.field490(template, series);
         model.addAttribute("work", work);
+        List<Work> works = data.works();
+        model.addAttribute("regions", works.stream().map(Work::region).filter(r -> !r.isEmpty()).distinct().toList());
+        model.addAttribute("klady", works.stream().map(Work::klad).filter(r -> !r.isEmpty()).distinct().toList());
         model.addAttribute("field490", f490);
         model.addAttribute("templateExists", template != null);
         return "admin/work-edit";
@@ -137,6 +140,53 @@ public class WorksController {
     }
 
     // ---- a new dílo ------------------------------------------------------------------
+
+    public record Rename(String layer, String region, String klad, String name) {
+    }
+
+    /** New title of a dílo (region; klad; name) in config.js — the files keep their names. */
+    @PostMapping("/admin/works/rename")
+    @ResponseBody
+    public Map<String, Object> rename(@RequestBody Rename req) {
+        if (!gate.isAdmin()) {
+            return Map.of("success", false, "message", "Nejste přihlášen(a) jako správce.");
+        }
+        Work work = req.layer() == null ? null : data.work(req.layer());
+        if (work == null) {
+            return Map.of("success", false, "message", "Mapové dílo neexistuje.");
+        }
+        String region = trim(req.region()), klad = trim(req.klad()), name = trim(req.name());
+        if (region.isEmpty() || klad.isEmpty() || name.isEmpty()) {
+            return Map.of("success", false, "message", "Vyplňte region, klad listů i název díla.");
+        }
+        if ((region + klad + name).contains(";")) {
+            return Map.of("success", false, "message", "Středník v názvu použít nejde – odděluje v seznamu region, klad a název.");
+        }
+        String config = withTitle(data.read(DataRepoService.CONFIG), work.layer(), region + "; " + klad + "; " + name);
+        if (config == null) {
+            return Map.of("success", false, "message", "Seznam mapových děl (config.js) se nepodařilo upravit.");
+        }
+        return saved(Map.of(DataRepoService.CONFIG, config), "Rename map work: " + work.name() + " -> " + name,
+                "/admin/works/edit?layer=" + AdminGate.enc(work.layer()));
+    }
+
+    /** config.js with a new title of the dílo with this layer (only that string changes), or null. */
+    static String withTitle(String config, String layer, String title) {
+        int at = config.indexOf("layer: " + jsString(layer));
+        int t = at < 0 ? -1 : config.lastIndexOf("title:", at);
+        if (t < 0 || t < config.lastIndexOf('}', at)) {
+            return null;
+        }
+        int open = config.indexOf('"', t);
+        int close = open + 1;
+        while (close < config.length() && config.charAt(close) != '"') {
+            close += config.charAt(close) == '\\' ? 2 : 1;
+        }
+        if (open < 0 || close >= at) {
+            return null;
+        }
+        return config.substring(0, open) + jsString(title) + config.substring(close + 1);
+    }
 
     @GetMapping("/admin/works/new")
     public String create(@RequestParam(required = false) String code, Model model, HttpServletRequest request) {
