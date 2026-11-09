@@ -9,7 +9,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("mapseries")
 public record MapseriesProperties(Repo repo, Oai oai, Github github, Editor editor, Authorities authorities) {
 
-    public record Repo(String readUser, String readName, String writeUser, String writeName) {
+    /** prUser/prName = where editor pull requests are opened; empty = the read repo
+     *  (production flow). A test deployment points it at its own fork so test
+     *  edits never reach the library's data. */
+    public record Repo(String readUser, String readName, String writeUser, String writeName,
+                       String prUser, String prName) {
+
+        public String prRepo() {
+            return (prUser == null || prUser.isBlank() ? readUser : prUser) + "/"
+                    + (prName == null || prName.isBlank() ? readName : prName);
+        }
     }
 
     public record Oai(String baseUrl, String set, int harvestLimit) {

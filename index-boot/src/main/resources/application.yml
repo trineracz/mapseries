@@ -37,6 +37,10 @@ mapseries:
     read-name: ${MAPSERIES_REPO_NAME:mapseries-data}
     write-user: ${MAPSERIES_REPO_WRITE_USER:trineracz}
     write-name: ${MAPSERIES_REPO_WRITE_NAME:mapseries-data}
+    # Where editor PRs are opened; empty = the read repo. Test deployments set
+    # their fork here so nothing reaches the library's production data.
+    pr-user: ${MAPSERIES_REPO_PR_USER:}
+    pr-name: ${MAPSERIES_REPO_PR_NAME:}
   oai:
     base-url: ${MAPSERIES_OAI_BASE_URL:http://aleph.mzk.cz/OAI}
     set: ${MAPSERIES_OAI_SET:MZK01-MAPY}

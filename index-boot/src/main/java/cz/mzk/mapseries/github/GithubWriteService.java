@@ -42,10 +42,11 @@ public class GithubWriteService {
 
     /** Commit the given files to a fresh branch in the WRITE repo (ONE commit) and
      *  open a Pull Request into the READ repo's master. When read == write this is
-     *  an internal PR; when they differ (a fork) it's a cross-fork PR to upstream. */
+     *  an internal PR; when they differ (a fork) it's a cross-fork PR to upstream.
+     *  mapseries.repo.pr-user/pr-name override the PR target (test deployments). */
     public SaveResult saveFiles(String token, String commitMessage, java.util.Map<String, String> files) {
         String writeRepo = props.repo().writeUser() + "/" + props.repo().writeName();
-        String baseRepo = props.repo().readUser() + "/" + props.repo().readName();
+        String baseRepo = props.repo().prRepo();
         if (props.editor() != null && props.editor().dryRun()) {
             log.warn("saveFiles: DRY-RUN — skipping commit of {} file(s) to {} + PR to {}: {}",
                     files.size(), writeRepo, baseRepo, files.keySet());
