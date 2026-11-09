@@ -179,7 +179,12 @@ public class SeriesEditorController {
         String locate = "edit".equals(mode) && req.originalName() != null && !req.originalName().isBlank()
                 ? req.originalName() : name;
         int idx = indexOfName(items, locate);
-        if (idx >= 0) { items.set(idx, entry); } else { items.add(entry); }
+        if (idx >= 0) {
+            keepEmptyDescriptions(items.get(idx), entry);
+            items.set(idx, entry);
+        } else {
+            items.add(entry);
+        }
 
         Map<String, String> files = new LinkedHashMap<>();
         files.put(CONTENT_DEFINITION_PATH, serialize(items));
@@ -327,32 +332,74 @@ public class SeriesEditorController {
                 .put("description", desc);
     }
 
+    /** A language left empty in the form keeps the original's empty value (null or ""),
+     *  so saving a series does not rewrite its untouched description lines. */
+    private static void keepEmptyDescriptions(JSONObject original, JSONObject entry) {
+        JSONObject was = original.optJSONObject("description");
+        JSONObject now = entry.getJSONObject("description");
+        if (was == null) {
+            return;
+        }
+        for (String lang : List.of("cs", "en")) {
+            Object old = was.opt(lang);
+            if (!now.has(lang) && was.has(lang) && (JSONObject.NULL.equals(old) || "".equals(old))) {
+                now.put(lang, old);
+            }
+        }
+    }
+
     /** Serialize with a stable key order (matches the repo's layout) to keep diffs clean. */
     static String serialize(List<JSONObject> items) {
         StringBuilder sb = new StringBuilder("[\n");
         for (int i = 0; i < items.size(); i++) {
             JSONObject o = items.get(i);
             sb.append(" {\n");
-            sb.append("  \"field\": ").append(JSONObject.quote(o.optString("field", ""))).append(",\n");
-            sb.append("  \"name\": ").append(JSONObject.quote(o.optString("name", ""))).append(",\n");
-            sb.append("  \"grid\": ").append(JSONObject.quote(o.optString("grid", ""))).append(",\n");
-            sb.append("  \"sheets\": ").append(JSONObject.quote(o.optString("sheets", ""))).append(",\n");
-            sb.append("  \"groupby\": ").append(JSONObject.quote(o.optString("groupby", ""))).append(",\n");
-            sb.append("  \"thumbnailUrl\": ").append(JSONObject.quote(o.optString("thumbnailUrl", ""))).append(",\n");
+            for (String key : List.of("field", "name", "grid", "sheets", "groupby", "thumbnailUrl")) {
+                sb.append("  \"").append(key).append("\": ").append(jsonValue(o, key)).append(",\n");
+            }
             sb.append("  \"description\": {\n");
             JSONObject d = o.optJSONObject("description");
             List<String> lines = new ArrayList<>();
             if (d != null) {
-                if (d.has("cs")) lines.add("   \"cs\": " + JSONObject.quote(d.optString("cs", "")));
-                if (d.has("en")) lines.add("   \"en\": " + JSONObject.quote(d.optString("en", "")));
+                if (d.has("cs")) lines.add("   \"cs\": " + jsonValue(d, "cs"));
+                if (d.has("en")) lines.add("   \"en\": " + jsonValue(d, "en"));
             }
             sb.append(String.join(",\n", lines)).append(lines.isEmpty() ? "" : "\n");
             sb.append("  }\n");
             sb.append(" }");
             sb.append(i < items.size() - 1 ? ",\n" : "\n");
         }
-        sb.append("]\n");
+        // the library's file has no newline at the end
+        sb.append("]");
         return sb.toString();
+    }
+
+    /** A value as the data repo writes it: null stays null, and text is escaped only
+     *  where JSON requires it, so unchanged entries produce no diff. */
+    private static String jsonValue(JSONObject o, String key) {
+        Object v = o.opt(key);
+        if (v == null || JSONObject.NULL.equals(v)) {
+            return o.has(key) ? "null" : "\"\"";
+        }
+        String text = v.toString();
+        StringBuilder sb = new StringBuilder("\"");
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                default -> {
+                    if (c < 0x20) sb.append(String.format("\\u%04x", (int) c));
+                    else sb.append(c);
+                }
+            }
+        }
+        return sb.append('"').toString();
     }
 
     private static String prettyName(String name) {
