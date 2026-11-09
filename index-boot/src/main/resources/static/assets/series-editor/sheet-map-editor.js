@@ -546,14 +546,19 @@ window.SheetMapEditor = (function () {
             mm.on("drag", function () { moveByCenter(mm); });
             mm.on("dragend", endDrag);
             mm.addTo(map); handles.push(mm);
-            // rotation handle above the top edge
-            var A = axes(selRect.angle), rpt = L.point(
-                selRect.cx + A.uy.x * (selRect.h / 2 * 1.4), selRect.cy + A.uy.y * (selRect.h / 2 * 1.4));
-            var rm = L.marker(map.options.crs.unproject(rpt), { draggable: true, icon: rotIcon });
+            // rotation handle above the edge that is on top on the screen: a sheet stored
+            // "upside down" (angle ~180°) gets it on its other side, the data stay as they are
+            var rm = L.marker(map.options.crs.unproject(rotPt(selRect, rotSide(selRect))), { draggable: true, icon: rotIcon });
+            rm._side = rotSide(selRect);
             rm.on("dragstart", function () { pushHistory(); isDragging = true; clearGhosts(); });
             rm.on("drag", function () { rotateByHandle(rm); });
             rm.on("dragend", endDrag);
             rm.addTo(map); handles.push(rm); rm._rot = true;
+        }
+        function rotSide(rc) { return axes(rc.angle).uy.y >= 0 ? 1 : -1; }  // projected y grows to the north
+        function rotPt(rc, side) {
+            var A = axes(rc.angle), d = side * rc.h / 2 * 1.4;
+            return L.point(rc.cx + A.uy.x * d, rc.cy + A.uy.y * d);
         }
         function edgeMidPt(rc, axisKey, sign) {
             var A = axes(rc.angle), ax = axisKey === "ux" ? A.ux : A.uy, ext = axisKey === "ux" ? rc.w : rc.h;
@@ -562,9 +567,7 @@ window.SheetMapEditor = (function () {
         function repositionHandles() {
             handles.forEach(function (m) {
                 if (m._rot) {
-                    var A = axes(selRect.angle);
-                    m.setLatLng(map.options.crs.unproject(
-                        L.point(selRect.cx + A.uy.x * (selRect.h / 2 * 1.4), selRect.cy + A.uy.y * (selRect.h / 2 * 1.4))));
+                    m.setLatLng(map.options.crs.unproject(rotPt(selRect, m._side)));
                 } else if (m._move) {
                     m.setLatLng(map.options.crs.unproject(L.point(selRect.cx, selRect.cy)));
                 } else if (m._edge) {
@@ -590,7 +593,7 @@ window.SheetMapEditor = (function () {
         function rotateByHandle(m) {
             var P = projLL(m.getLatLng());
             var dx = P.x - selRect.cx, dy = P.y - selRect.cy;
-            var a = Math.atan2(-dx, dy);
+            var a = Math.atan2(-dx, dy) + (m._side < 0 ? Math.PI : 0);
             if (snapKey) { var step = Math.PI / 12; a = Math.round(a / step) * step; }
             selRect.angle = a;
             applyRect(selectedFeature, selRect, selectedLayer);
