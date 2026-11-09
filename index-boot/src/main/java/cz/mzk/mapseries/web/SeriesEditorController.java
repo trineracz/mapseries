@@ -196,10 +196,7 @@ public class SeriesEditorController {
         } catch (Exception e) {
             return Map.of("success", false, "message", "Uložení na GitHub selhalo: " + e.getMessage());
         }
-        String message = dryRun() || !result.committed()
-                ? "Uloženo (testovací režim — nevytvořen návrh změny)."
-                : "Vytvořen návrh změny (PR" + (result.prNumber() > 0 ? " #" + result.prNumber() : "")
-                        + ") — čeká na schválení správcem.";
+        String message = result.userMessage();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("success", true);
         out.put("redirect", "/admin/series");

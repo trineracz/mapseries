@@ -179,10 +179,7 @@ public class GridsController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("success", true);
         out.put("redirect", "/admin/grids/edit?name=" + AdminGate.enc(name));
-        out.put("message", gate.dryRun() || !result.committed()
-                ? "Uloženo (testovací režim — nevytvořen návrh změny)."
-                : "Vytvořen návrh změny (PR" + (result.prNumber() > 0 ? " #" + result.prNumber() : "")
-                        + ") — čeká na schválení správcem.");
+        out.put("message", result.userMessage());
         if (result.prUrl() != null) {
             out.put("prUrl", result.prUrl());
         }

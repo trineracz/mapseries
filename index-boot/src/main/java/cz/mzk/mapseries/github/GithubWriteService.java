@@ -31,8 +31,23 @@ public class GithubWriteService {
 
     /** Outcome of a save: the branch that was pushed and the PR opened for it.
      *  In dry-run everything is null / -1 (nothing was written). */
-    public record SaveResult(String branch, String prUrl, int prNumber) {
+    public record SaveResult(String branch, String prUrl, int prNumber, boolean unchanged) {
+        public SaveResult(String branch, String prUrl, int prNumber) {
+            this(branch, prUrl, prNumber, false);
+        }
+
+        static SaveResult nothingChanged() {
+            return new SaveResult(null, null, -1, true);
+        }
+
         public boolean committed() { return branch != null; }
+
+        /** The line shown to the user after saving. */
+        public String userMessage() {
+            if (unchanged) return "Žádné změny k uložení — návrh změny nevznikl.";
+            if (!committed()) return "Uloženo (testovací režim — nevytvořen návrh změny).";
+            return "Vytvořen návrh změny (PR" + (prNumber > 0 ? " #" + prNumber : "") + ") — čeká na schválení správcem.";
+        }
     }
 
     /** Commit a single file (convenience wrapper around {@link #saveFiles}). */
@@ -60,10 +75,6 @@ public class GithubWriteService {
             String masterSha = get(api + "/git/refs/heads/master", token)
                     .getJSONObject("object").getString("sha");
 
-            // branch off the write repo's current master
-            post(api + "/git/refs", token, new JSONObject()
-                    .put("ref", "refs/heads/" + branch).put("sha", masterSha));
-
             String baseTreeSha = get(api + "/git/commits/" + masterSha, token)
                     .getJSONObject("tree").getString("sha");
 
@@ -76,6 +87,14 @@ public class GithubWriteService {
             }
             String newTreeSha = post(api + "/git/trees", token,
                     new JSONObject().put("base_tree", baseTreeSha).put("tree", tree)).getString("sha");
+            if (newTreeSha.equals(baseTreeSha)) {
+                log.info("saveFiles: {} file(s) identical to {}@master, nothing to propose", files.size(), writeRepo);
+                return SaveResult.nothingChanged();
+            }
+
+            // branch off the write repo's current master
+            post(api + "/git/refs", token, new JSONObject()
+                    .put("ref", "refs/heads/" + branch).put("sha", masterSha));
 
             String newCommitSha = post(api + "/git/commits", token, new JSONObject()
                     .put("message", commitMessage)
