@@ -1374,8 +1374,8 @@ class ComboBoxImpl extends Component_ {
     h.listen(this.input_, 'blur', this.onInputBlur_);
     // Closure fed this from goog.events.KeyHandler, which in today's browsers
     // only delivered keys that fire 'keypress' (Enter and characters), so the
-    // arrows, Home/End never worked. They do now (keydown); Tab keeps moving to
-    // the next field as before (see handleKeyEvent).
+    // arrows never worked. They do now (keydown); Home/End stay with the text and
+    // Tab keeps moving to the next field as before (see handleKeyEvent).
     h.listen(this.input_, 'keydown', this.handleKeyEvent);
     h.listen(this.input_, 'input', this.onInputEvent_);
     this.menu_.listen('action', this.onMenuSelected_, this);
@@ -1528,6 +1528,9 @@ class ComboBoxImpl extends Component_ {
     this.dismissTimer_ = setTimeout(() => this.dismiss(), BLUR_DISMISS_TIMER_MS);
   }
   handleKeyEvent(e) {
+    // Home/End move the caret in the text (to add to a prefilled value such as
+    // 500 "Další údaje o vydání:"), as they always did; the menu has the arrows
+    if (e.keyCode == goog.events.KeyCodes.HOME || e.keyCode == goog.events.KeyCodes.END) return false;
     const isMenuVisible = this.menu_.isVisible();
     if (isMenuVisible && this.menu_.handleKeyEvent(e)) return true;
     let handled = false;
